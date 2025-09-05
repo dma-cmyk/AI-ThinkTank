@@ -2,8 +2,7 @@
 
 複数のAIエージェントが専門家として一つの議題について議論を交わす様子をシミュレートするWebアプリケーションです。
 
-![AI ThinkTank Screenshot](https://via.placeholder.com/800x450.png?text=AI+ThinkTank+Screenshot)
-*(ここにアプリケーションのスクリーンショットを挿入します)*
+![AI ThinkTank Screenshot](screenshot.jpg)
 
 ---
 
