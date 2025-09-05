@@ -1,0 +1,2860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI コンサル掲示板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.1/dist/purify.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-icon-opacity: 0.08; /* Default value */
+        }
+        html.dark {
+            color-scheme: dark;
+        }
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #4f46e5; /* indigo-600 */
+            animation: spin 1s ease infinite;
+        }
+        html.dark .spinner {
+             border-left-color: #a5b4fc; /* indigo-300 */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .post {
+            position: relative;
+            overflow: hidden;
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb; /* slate-200 */
+            text-align: left;
+        }
+        html.dark .post {
+            border-bottom-color: #374151; /* slate-700 */
+        }
+        .post:last-child {
+            border-bottom: none;
+        }
+        .post-header {
+            font-size: 0.875rem; /* text-sm */
+            color: #6b7280; /* slate-500 */
+            margin-bottom: 0.5rem; /* mb-2 */
+        }
+        html.dark .post-header {
+            color: #9ca3af; /* slate-400 */
+        }
+        .post-body {
+            color: #1f2937; /* slate-800 */
+            line-height: 1.75;
+            white-space: pre-wrap;
+        }
+        html.dark .post-body {
+            color: #d1d5db; /* slate-300 */
+        }
+        
+        /* === NEW ICON POSITIONING STYLES === */
+        
+        /* --- Right Position (Watermark) Styles --- */
+        .post.icon-pos-right .post-background-icon {
+            display: none;
+            position: absolute;
+            top: 50%;
+            right: 2rem;
+            transform: translateY(-50%);
+            font-size: 8rem;
+            line-height: 1;
+            opacity: var(--bg-icon-opacity);
+            z-index: 0;
+            pointer-events: none;
+            user-select: none;
+            color: #1f2937;
+        }
+        html.dark .post.icon-pos-right .post-background-icon {
+            color: #f1f5f9;
+        }
+        .post.icon-pos-right.show-bg-icon .post-background-icon {
+            display: block;
+        }
+        .post.icon-pos-right .post-background-icon.is-image {
+            width: 8rem;
+            height: 8rem;
+            font-size: initial;
+            opacity: 1;
+        }
+        .post.icon-pos-right .post-background-icon.is-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            opacity: var(--bg-icon-opacity);
+            border-radius: 0.375rem;
+        }
+        html.dark .post.icon-pos-right .post-background-icon.is-image img {
+            mix-blend-mode: screen;
+        }
+
+        /* --- Left Position (Avatar) Styles --- */
+        .post.icon-pos-left {
+            padding-left: 5.5rem;
+        }
+        .post.icon-pos-left .post-background-icon {
+            display: none;
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            right: auto;
+            transform: none;
+            width: 3.5rem;
+            height: 3.5rem;
+            font-size: 2.25rem;
+            opacity: 1;
+            z-index: 0;
+            pointer-events: none;
+            user-select: none;
+            color: #475569;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #e2e8f0;
+        }
+        html.dark .post.icon-pos-left .post-background-icon {
+            color: #d1d5db;
+            background-color: #475569;
+        }
+        .post.icon-pos-left.show-bg-icon .post-background-icon {
+            display: flex;
+        }
+        .post.icon-pos-left .post-background-icon.is-image {
+            font-size: initial;
+            background-color: transparent;
+        }
+        .post.icon-pos-left .post-background-icon.is-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 1;
+            border-radius: 9999px;
+            mix-blend-mode: normal;
+        }
+
+
+        /* --- Improved Markdown Styles --- */
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+            font-weight: 700; margin-top: 1.5em; margin-bottom: 0.75em; padding-bottom: 0.3em; border-bottom: 1px solid #e5e7eb; color: #111827;
+        }
+        html.dark .markdown-content h1, html.dark .markdown-content h2, html.dark .markdown-content h3 {
+             border-bottom-color: #374151; color: #f9fafb;
+        }
+        .markdown-content ul, .markdown-content ol {
+            padding: 1rem 1rem 1rem 2.5rem; margin: 1em 0; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.5rem;
+        }
+        html.dark .markdown-content ul, html.dark .markdown-content ol {
+             background-color: #1f2937; border-color: #374151;
+        }
+        .markdown-content li { margin-bottom: 0.5em; }
+        .markdown-content p { margin-bottom: 1em; }
+        .markdown-content a { color: #4f46e5; text-decoration: none; }
+         html.dark .markdown-content a { color: #a5b4fc; }
+        .markdown-content a:hover { text-decoration: underline; }
+        .markdown-content pre {
+            background-color: #1f2937; color: #e5e7eb; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 1em 0; border: 1px solid #374151;
+        }
+        html.dark .markdown-content pre {
+             background-color: #0f172a; border-color: #374151;
+        }
+        .markdown-content code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; font-size: 0.9em; background-color: #e5e7eb; color: #be123c; padding: 0.2em 0.4em; border-radius: 0.25rem;
+        }
+        html.dark .markdown-content code {
+             background-color: #374151; color: #fda4af;
+        }
+        .markdown-content pre > code { background-color: transparent; color: inherit; padding: 0; }
+        .markdown-content blockquote {
+            margin: 1em 0; padding: 0.5em 1em; border-left: 4px solid #6366f1; border-radius: 0.25rem; background-color: #f1f5f9; color: #4b5563;
+        }
+         html.dark .markdown-content blockquote {
+            border-left-color: #818cf8; background-color: #1e293b; color: #9ca3af;
+        }
+        .markdown-content blockquote p { margin-bottom: 0; }
+        .markdown-content hr { border: none; border-top: 1px solid #e5e7eb; margin: 2em 0; }
+        html.dark .markdown-content hr { border-top-color: #374151; }
+
+        /* --- 要約モーダル専用スタイル --- */
+        .summary-body {
+            font-size: 1rem; /* 16px */
+            line-height: 1.8;
+            color: #374151; /* slate-700 */
+        }
+        html.dark .summary-body {
+             color: #d1d5db;
+        }
+        .summary-body ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .summary-body li {
+            position: relative;
+            padding-left: 1.75rem; /* 28px */
+            margin-bottom: 1rem; /* 16px */
+        }
+        .summary-body li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.5rem; /* アイコンの垂直位置を調整 */
+            width: 0.75rem; /* 12px */
+            height: 0.75rem; /* 12px */
+            background-color: #818cf8; /* indigo-400 */
+            border-radius: 9999px; /* 円形にする */
+        }
+        html.dark .summary-body li::before {
+             background-color: #6366f1;
+        }
+        .summary-body h1, .summary-body h2, .summary-body h3 {
+            border-bottom: 2px solid #c7d2fe; /* indigo-200 */
+        }
+        html.dark .summary-body h1, html.dark .summary-body h2, html.dark .summary-body h3 {
+             border-bottom-color: #4f46e5;
+        }
+        .summary-body p:last-child {
+            margin-bottom: 0;
+        }
+        .file-preview-item {
+            display: flex;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            background-color: #f1f5f9; /* slate-100 */
+            margin-bottom: 0.5rem;
+        }
+        html.dark .file-preview-item {
+            background-color: #334155; /* slate-700 */
+        }
+        .file-preview-item:last-child {
+            margin-bottom: 0;
+        }
+        .icon-picker-item {
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.875rem; /* text-3xl */
+            line-height: 2.25rem;
+        }
+        .icon-picker-item:hover {
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        html.dark .icon-picker-item:hover {
+            background-color: #334155; /* slate-700 */
+        }
+
+        #scroll-controller {
+            cursor: grab;
+            user-select: none; /* Prevent text selection while dragging */
+            touch-action: none; /* Prevent scrolling on touch devices */
+        }
+        #scroll-controller.dragging {
+            cursor: grabbing;
+        }
+
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 transition-colors duration-300">
+    <div class="relative flex h-screen">
+        <!-- 設定パネル（サイドバー） -->
+        <div id="settings-panel" class="fixed inset-y-0 left-0 z-30 w-full max-w-sm bg-white dark:bg-slate-800 p-6 shadow-lg overflow-y-auto transform -translate-x-full transition-transform duration-300 ease-in-out">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-2xl font-bold text-slate-800 dark:text-slate-200">設定</h1>
+                <button id="close-menu-btn" class="p-2 -mr-2 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+             <!-- トピック -->
+            <div class="mb-6">
+                <label for="topic" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">議論のトピック（スレタイ）</label>
+                <input type="text" id="topic" class="w-full p-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" value="AIを使った副業で月5万円稼ぐ方法">
+            </div>
+
+            <!-- 最大応答文字数 -->
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-2">
+                    <label for="max-chars" class="block text-sm font-medium text-slate-700 dark:text-slate-300">最大応答文字数（目安）</label>
+                    <span id="max-chars-value" class="text-sm font-semibold text-slate-800 dark:text-slate-200 tabular-nums">30</span>
+                </div>
+                <input type="range" id="max-chars" class="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer" value="30" min="30" max="4000" step="10">
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">AIが一度に生成する文章のおおよその文字数を設定します。</p>
+            </div>
+            
+            <!-- 最大レス数 -->
+            <div class="mb-6">
+                <label for="max-posts" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">最大レス数</label>
+                <input type="number" id="max-posts" class="w-full p-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500" value="10" min="2" max="100" step="1">
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">議論を自動で停止するまでの投稿数を設定します。</p>
+            </div>
+            
+            <!-- 保持するレス数 -->
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-2">
+                    <label for="history-length" class="block text-sm font-medium text-slate-700 dark:text-slate-300">保持するレス数</label>
+                    <span id="history-length-value" class="text-sm font-semibold text-slate-800 dark:text-slate-200 tabular-nums">10</span>
+                </div>
+                <input type="range" id="history-length" class="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer" value="10" min="2" max="50" step="2">
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">AIが文脈を理解するために記憶しておく直近のレス数を設定します。</p>
+            </div>
+            
+            <!-- 表示設定 -->
+            <div class="mb-6">
+                 <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">表示設定</label>
+                 <div class="space-y-3 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <!-- 背景アイコン設定 -->
+                    <div class="flex items-center justify-between">
+                        <label for="background-icon-toggle" class="text-sm text-slate-700 dark:text-slate-300">背景アイコン</label>
+                        <label for="background-icon-toggle" class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" value="" id="background-icon-toggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+                     <p class="text-xs text-slate-500 dark:text-slate-400 -mt-2">各投稿の背景にアイコンを薄く表示します。</p>
+                    
+                    <!-- アイコンの濃さスライダー & 表示位置 -->
+                    <div id="background-icon-options-container" class="hidden pt-3 border-t dark:border-slate-600">
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                 <label for="background-icon-opacity" class="text-sm text-slate-700 dark:text-slate-300">アイコンの濃さ</label>
+                                 <span id="background-icon-opacity-value" class="text-xs font-semibold text-slate-800 dark:text-slate-200 tabular-nums">8%</span>
+                            </div>
+                            <input type="range" id="background-icon-opacity" class="w-full h-2 bg-slate-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer" value="0.08" min="0.01" max="0.5" step="0.01">
+                        </div>
+                        <div class="mt-4">
+                            <label for="background-icon-position" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">表示位置</label>
+                            <select id="background-icon-position" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                                <option value="right">右側（すかし）</option>
+                                <option value="left">左側（アイコン）</option>
+                            </select>
+                        </div>
+                    </div>
+                     
+                    <!-- 効果音設定 -->
+                    <div class="flex items-center justify-between pt-3 border-t dark:border-slate-600">
+                        <label for="sound-toggle" class="text-sm text-slate-700 dark:text-slate-300">効果音</label>
+                        <label for="sound-toggle" class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" value="" id="sound-toggle" class="sr-only peer">
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+                     <p class="text-xs text-slate-500 dark:text-slate-400 -mt-2">レスが表示される時に効果音を鳴らします。</p>
+                 
+                    <!-- コントローラー表示設定 -->
+                    <div class="flex items-center justify-between pt-3 border-t dark:border-slate-600">
+                        <label for="controller-toggle" class="text-sm text-slate-700 dark:text-slate-300">フローティングコントローラー</label>
+                        <label for="controller-toggle" class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" value="" id="controller-toggle" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                        </label>
+                    </div>
+                     <p class="text-xs text-slate-500 dark:text-slate-400 -mt-2">画面右のスクロール操作ボタンを表示します。</p>
+                 </div>
+            </div>
+
+            <!-- 議論モード -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">議論モード</label>
+                <div class="space-y-2">
+                    <div class="flex items-center p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <input type="radio" id="mode-interactive" name="discussion-mode" value="interactive" class="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500" checked>
+                        <label for="mode-interactive" class="ml-3 block text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                            <span class="font-semibold">対話形式</span>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">各コンサルタントの回答後にユーザーAIが質問します。</p>
+                        </label>
+                    </div>
+                    <div class="flex items-center p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <input type="radio" id="mode-sequential" name="discussion-mode" value="sequential" class="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500">
+                        <label for="mode-sequential" class="ml-3 block text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                             <span class="font-semibold">順番形式</span>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">全コンサルタントが回答後、ユーザーAIが質問します。</p>
+                        </label>
+                    </div>
+                    <div class="flex items-center p-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                        <input type="radio" id="mode-autonomous" name="discussion-mode" value="autonomous" class="h-4 w-4 text-indigo-600 border-slate-300 focus:ring-indigo-500">
+                        <label for="mode-autonomous" class="ml-3 block text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                             <span class="font-semibold">AI指名形式</span>
+                             <p class="text-xs text-slate-500 dark:text-slate-400">ユーザーAIの質問に最適なコンサルタントをAIが選びます。</p>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- コンサルタントAI設定 -->
+            <div id="consultant-settings-container" class="mb-6 space-y-6">
+                <!-- Consultant blocks will be dynamically inserted here -->
+            </div>
+            <button id="add-consultant-btn" class="w-full mb-6 py-2 px-4 border-2 border-dashed border-indigo-400 dark:border-indigo-600 text-indigo-600 dark:text-indigo-400 font-semibold rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/50 transition-colors flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12"x2="19" y2="12"></line></svg>
+                議論にコンサルタントを追加
+            </button>
+
+
+            <!-- ユーザーAI設定 -->
+            <div class="mb-6">
+                 <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2 text-slate-600 dark:text-slate-400"><path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20a8 8 0 0 0-6-7.75"/></svg>
+                    ユーザー AI
+                </h2>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">アイコン</label>
+                    <div class="flex items-center space-x-3">
+                        <div id="user-icon-preview" class="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 text-3xl">
+                            <!-- Icon will be injected here -->
+                        </div>
+                        <button id="change-user-icon-btn" class="py-1 px-3 bg-slate-200 dark:bg-slate-600 text-sm rounded-md hover:bg-slate-300 dark:hover:bg-slate-500">変更</button>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 mb-1">
+                    <label for="user-type" class="block text-sm font-medium text-slate-700 dark:text-slate-300">ユーザーの種類</label>
+                    <button id="manage-users-btn" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">管理</button>
+                </div>
+                <select id="user-type" class="w-full p-2 mb-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg bg-white shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                    <!-- Options are populated by JavaScript -->
+                </select>
+                <label for="user-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">名前</label>
+                <input type="text" id="user-name" class="w-full p-2 mb-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg" value="ユウキ">
+                <label for="user-persona" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ペルソナ（役割設定）</label>
+                <textarea id="user-persona" rows="6" class="w-full p-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"></textarea>
+            </div>
+            
+            <!-- 操作ボタン -->
+            <div class="space-y-6">
+                 <div>
+                    <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">議論の操作</h3>
+                    <div class="flex space-x-4">
+                        <button id="start-btn" class="w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">議論開始</button>
+                        <button id="clear-btn" class="w-full py-3 px-4 bg-slate-500 text-white font-semibold rounded-lg shadow-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 transition-colors">クリア</button>
+                    </div>
+                </div>
+                <div>
+                     <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">スレッド管理</h3>
+                     <div class="flex space-x-4">
+                        <button id="save-btn" class="w-full py-2 px-4 bg-emerald-600 text-white font-semibold rounded-lg shadow-md hover:bg-emerald-700">名前を付けて保存</button>
+                        <button id="load-btn" class="w-full py-2 px-4 bg-amber-600 text-white font-semibold rounded-lg shadow-md hover:bg-amber-700">復元</button>
+                    </div>
+                </div>
+                 <div>
+                    <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">エクスポート</h3>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button id="download-json-btn" class="w-full py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800">JSON (ローカル)</button>
+                        <button id="download-dat-btn" class="w-full py-2 px-4 bg-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-800">DAT (ローカル)</button>
+                    </div>
+                </div>
+                <button id="summarize-btn" class="w-full py-3 px-4 bg-sky-600 text-white font-semibold rounded-lg shadow-md hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors">要約する</button>
+            </div>
+            <!-- Gemini API Key Setting -->
+            <div class="mb-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">Gemini API 設定</h3>
+                <div class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg space-y-4">
+                    <div>
+                        <label for="gemini-model-select" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">モデル</label>
+                        <select id="gemini-model-select" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg text-sm">
+                            <option value="gemini-2.5-flash-preview-05-20">Gemini 2.5 Flash (Preview)</option>
+                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="gemini-api-key-input" class="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">APIキー</label>
+                        <input type="password" id="gemini-api-key-input" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg text-sm" placeholder="ご自身のGemini APIキーを入力">
+                    </div>
+                    <button id="save-gemini-api-key-btn" class="w-full py-2 px-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 text-sm">設定を保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- メニュー用オーバーレイ -->
+        <div id="menu-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden"></div>
+
+        <!-- メインコンテンツ -->
+        <div class="w-full flex flex-col h-full bg-slate-50 dark:bg-slate-900/50">
+             <!-- ヘッダー -->
+            <div class="flex-shrink-0 bg-white dark:bg-slate-800 shadow-sm flex items-center justify-between p-4 z-10 border-b border-slate-200 dark:border-slate-700">
+                <div class="flex items-center min-w-0">
+                    <button id="open-menu-btn" class="p-2 rounded-md mr-4 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200 truncate">AI コンサル掲示板</h2>
+                </div>
+                 <div class="flex items-center space-x-2 sm:space-x-4">
+                     <div id="token-counter" class="text-sm text-slate-600 dark:text-slate-400 font-medium hidden sm:block">
+                        使用トークン数: 入力 <span id="input-token-count" class="font-bold text-slate-800 dark:text-slate-200">0</span> / 出力 <span id="output-token-count" class="font-bold text-slate-800 dark:text-slate-200">0</span>
+                     </div>
+                     <button id="open-how-to-use-btn" title="使い方ガイド" class="p-2 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                     </button>
+                     <button id="theme-toggle-btn" class="p-2 rounded-md text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
+                        <svg id="theme-icon-light" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                        <svg id="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                     </button>
+                 </div>
+            </div>
+
+            <!-- 掲示板画面 -->
+            <div id="chat-container" class="flex-1 overflow-y-auto bg-white dark:bg-slate-800/50 shadow-inner">
+                <!-- スレッドタイトル (スクロール追従) -->
+                <div id="thread-title-container" class="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hidden">
+                    <h1 id="thread-title-text" class="text-2xl font-bold text-slate-800 dark:text-slate-200"></h1>
+                </div>
+                <div class="initial-message text-center p-8 text-slate-500 dark:text-slate-400">
+                    <h2 class="text-xl font-semibold mb-2">AIコンサル掲示板</h2>
+                    <p>「議論開始」ボタンを押すと、AI同士の議論が始まります。</p>
+                </div>
+            </div>
+            <div id="loading-indicator" class="p-4 hidden flex justify-center items-center border-t dark:border-slate-700">
+                <div class="spinner"></div>
+                <p class="ml-4 text-slate-600 dark:text-slate-400">AIが応答を生成中です...</p>
+            </div>
+            <!-- User Input Area -->
+            <div id="user-input-container" class="p-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+                <div id="file-preview-container" class="hidden mb-2 p-2 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg max-h-32 overflow-y-auto">
+                    <!-- File previews will be dynamically inserted here -->
+                </div>
+                <div class="relative">
+                    <input type="file" id="file-upload-input" multiple class="hidden">
+                    <button id="attach-file-btn" title="ファイルを添付" class="absolute left-2 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.49"></path></svg>
+                    </button>
+                    <textarea id="user-message-input" rows="1" class="w-full p-3 pl-12 pr-20 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg shadow-sm resize-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-slate-100 dark:disabled:bg-slate-600" placeholder="メッセージを入力..."></textarea>
+                    <button id="send-message-btn" class="absolute right-2 top-1/2 -translate-y-1/2 py-2 px-4 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                        送信
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- モーダルウィンドウ群 -->
+    <div id="icon-picker-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-sm m-4">
+            <div class="flex justify-between items-center p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">アイコンを選択</h2>
+                <button id="close-icon-picker-btn" class="p-2 -mr-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-full">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div id="icon-grid" class="grid grid-cols-4 sm:grid-cols-6 gap-4 p-6 max-h-60 overflow-y-auto">
+                <!-- Icons populated by JS -->
+            </div>
+            <div class="p-4 border-t dark:border-slate-700 space-y-3">
+                <div>
+                    <label for="icon-url-input" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">URLから読み込み</label>
+                    <div class="flex space-x-2">
+                        <input type="url" id="icon-url-input" placeholder="https://example.com/image.png" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg text-sm shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <button id="icon-url-load-btn" class="py-2 px-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 text-sm flex-shrink-0">読込</button>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 !my-3">
+                    <hr class="flex-grow border-slate-200 dark:border-slate-600">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">または</span>
+                    <hr class="flex-grow border-slate-200 dark:border-slate-600">
+                </div>
+                <div class="space-y-2">
+                    <button id="icon-paste-btn" class="w-full py-2 px-4 bg-slate-200 dark:bg-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">
+                        クリップボードから貼り付け
+                    </button>
+                    <input type="file" id="icon-upload-input" class="hidden" accept="image/png, image/jpeg, image/gif, image/webp">
+                    <button id="icon-upload-btn" class="w-full py-2 px-4 bg-slate-200 dark:bg-slate-600 text-sm font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-500">
+                        ファイルをアップロード...
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="summary-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col m-4">
+            <div class="flex justify-between items-center p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">議論の要約</h2>
+                <button id="close-summary-modal-btn" class="p-2 -mr-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-full">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto">
+                <div id="summary-loading" class="flex flex-col items-center justify-center p-8">
+                     <div class="spinner"></div>
+                     <p class="mt-4 text-slate-600 dark:text-slate-400">要約を生成しています...</p>
+                </div>
+                <div id="summary-content" class="markdown-content summary-body hidden"></div>
+            </div>
+             <div class="p-4 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center rounded-b-lg">
+                <div class="space-x-2">
+                    <button id="download-summary-txt-btn" class="py-2 px-4 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 text-sm">テキストで保存 (.txt)</button>
+                    <button id="download-summary-md-btn" class="py-2 px-4 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 text-sm">Markdownで保存 (.md)</button>
+                </div>
+                <button id="close-summary-modal-btn-bottom" class="py-2 px-4 bg-slate-600 text-white font-semibold rounded-lg shadow-md hover:bg-slate-700">閉じる</button>
+            </div>
+        </div>
+    </div>
+    <div id="load-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col m-4">
+            <div class="flex justify-between items-center p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">スレッドを復元</h2>
+                <button id="close-load-modal-btn" class="p-2 -mr-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-full">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div id="load-list-container" class="p-6 overflow-y-auto"></div>
+             <div class="p-4 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-right rounded-b-lg">
+                <button id="close-load-modal-btn-bottom" class="py-2 px-4 bg-slate-600 text-white font-semibold rounded-lg shadow-md hover:bg-slate-700">閉じる</button>
+            </div>
+        </div>
+    </div>
+    <div id="save-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-md m-4">
+            <div class="p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">名前を付けて保存</h2>
+            </div>
+            <div class="p-6">
+                <label for="save-name-input" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">スレッド名</label>
+                <input type="text" id="save-name-input" class="w-full p-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+             <div class="p-4 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
+                <button id="cancel-save-btn" class="py-2 px-4 bg-slate-500 text-white font-semibold rounded-lg hover:bg-slate-600">キャンセル</button>
+                <button id="confirm-save-btn" class="py-2 px-4 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700">保存</button>
+            </div>
+        </div>
+    </div>
+    <div id="confirm-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black bg-opacity-70">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-sm m-4">
+            <div class="p-6 text-center">
+                <svg class="mx-auto mb-4 text-yellow-400 w-12 h-12" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11V6m0 8h.01M19 10a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+                <p id="confirm-message" class="mb-5 text-lg font-normal text-slate-600 dark:text-slate-300"></p>
+                <button id="confirm-yes-btn" class="text-white bg-red-600 hover:bg-red-800 font-medium rounded-lg text-sm inline-flex items-center px-5 py-2.5 text-center mr-2">はい、削除します</button>
+                <button id="confirm-no-btn" class="text-slate-500 bg-white dark:bg-slate-600 hover:bg-slate-100 dark:hover:bg-slate-500 rounded-lg border border-slate-200 dark:border-slate-500 text-sm font-medium px-5 py-2.5 hover:text-slate-900 dark:hover:text-white focus:z-10">いいえ</button>
+            </div>
+        </div>
+    </div>
+    <div id="manage-consultants-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col m-4">
+            <div class="flex justify-between items-center p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">カスタムコンサルタントの管理</h2>
+                <button id="close-manage-consultants-btn" class="p-2 -mr-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-full">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-6">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">保存済みリスト</h3>
+                    <div id="custom-consultant-list-container"></div>
+                </div>
+                <div class="border-t dark:border-slate-700 pt-6">
+                    <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">新規追加</h3>
+                    <button id="generate-persona-in-manager-btn" class="w-full text-sm py-2 px-4 mb-4 bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/50 dark:text-fuchsia-300 font-semibold rounded-lg hover:bg-fuchsia-200 dark:hover:bg-fuchsia-900 transition-colors">キーワードから自動生成</button>
+                    <div class="space-y-4">
+                         <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">アイコン</label>
+                            <div class="flex items-center space-x-3">
+                                <div id="new-consultant-icon-preview" class="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-500 dark:text-slate-400 text-2xl"></div>
+                                <button class="change-new-persona-icon-btn py-1 px-3 bg-slate-200 dark:bg-slate-600 text-sm rounded-md" data-target-id="new-consultant">変更</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="new-consultant-preset-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">プリセット名</label>
+                            <input type="text" id="new-consultant-preset-name" placeholder="例：マーケティング専門家" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label for="new-consultant-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">コンサルタント名</label>
+                            <input type="text" id="new-consultant-name" placeholder="例：マーケター山田" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label for="new-consultant-persona" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ペルソナ</label>
+                            <textarea id="new-consultant-persona" rows="5" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg"></textarea>
+                        </div>
+                        <button id="add-new-consultant-btn" class="w-full py-2 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700">追加する</button>
+                    </div>
+                </div>
+            </div>
+             <div class="p-4 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-right rounded-b-lg">
+                <button id="close-manage-consultants-btn-bottom" class="py-2 px-4 bg-slate-600 text-white font-semibold rounded-lg shadow-md hover:bg-slate-700">閉じる</button>
+            </div>
+        </div>
+    </div>
+    <div id="manage-users-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col m-4">
+            <div class="flex justify-between items-center p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">カスタムユーザーの管理</h2>
+                <button id="close-manage-users-btn" class="p-2 -mr-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-full">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-6">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">保存済みリスト</h3>
+                    <div id="custom-user-list-container"></div>
+                </div>
+                <div class="border-t dark:border-slate-700 pt-6">
+                    <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">新規追加</h3>
+                    <button id="generate-user-persona-in-manager-btn" class="w-full text-sm py-2 px-4 mb-4 bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/50 dark:text-fuchsia-300 font-semibold rounded-lg hover:bg-fuchsia-200 dark:hover:bg-fuchsia-900 transition-colors">キーワードから自動生成</button>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">アイコン</label>
+                            <div class="flex items-center space-x-3">
+                                <div id="new-user-icon-preview" class="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-500 dark:text-slate-400 text-2xl"></div>
+                                <button class="change-new-persona-icon-btn py-1 px-3 bg-slate-200 dark:bg-slate-600 text-sm rounded-md" data-target-id="new-user">変更</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="new-user-preset-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">プリセット名</label>
+                            <input type="text" id="new-user-preset-name" placeholder="例：慎重な投資家" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label for="new-user-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ユーザー名</label>
+                            <input type="text" id="new-user-name" placeholder="例：ケンジ" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label for="new-user-persona" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ペルソナ</label>
+                            <textarea id="new-user-persona" rows="5" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg"></textarea>
+                        </div>
+                        <button id="add-new-user-btn" class="w-full py-2 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700">追加する</button>
+                    </div>
+                </div>
+            </div>
+             <div class="p-4 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-right rounded-b-lg">
+                <button id="close-manage-users-btn-bottom" class="py-2 px-4 bg-slate-600 text-white font-semibold rounded-lg shadow-md hover:bg-slate-700">閉じる</button>
+            </div>
+        </div>
+    </div>
+    <div id="generate-persona-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-md m-4">
+            <div class="p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">ペルソナ自動生成</h2>
+            </div>
+            <div class="p-6">
+                <label for="persona-keywords-input" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">専門分野や特徴をキーワードで入力してください</label>
+                <input type="text" id="persona-keywords-input" placeholder="例：SNSマーケティング, 親しみやすい" class="w-full p-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                <div id="persona-generation-spinner" class="hidden justify-center pt-4"><div class="spinner"></div></div>
+            </div>
+             <div class="p-4 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
+                <button id="cancel-generate-persona-btn" class="py-2 px-4 bg-slate-500 text-white font-semibold rounded-lg hover:bg-slate-600">キャンセル</button>
+                <button id="confirm-generate-persona-btn" class="py-2 px-4 bg-fuchsia-600 text-white font-semibold rounded-lg hover:bg-fuchsia-700">生成</button>
+            </div>
+        </div>
+    </div>
+    <div id="edit-consultant-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-xl m-4">
+            <div class="p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">カスタムコンサルタントを編集</h2>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">アイコン</label>
+                    <div class="flex items-center space-x-3">
+                        <div id="edit-consultant-icon-preview" class="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-500 dark:text-slate-400 text-2xl"></div>
+                        <button class="change-edit-persona-icon-btn py-1 px-3 bg-slate-200 dark:bg-slate-600 text-sm rounded-md" data-target-id="edit-consultant">変更</button>
+                    </div>
+                </div>
+                <div>
+                    <label for="edit-consultant-preset-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">プリセット名</label>
+                    <input type="text" id="edit-consultant-preset-name" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg">
+                </div>
+                <div>
+                    <label for="edit-consultant-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">コンサルタント名</label>
+                    <input type="text" id="edit-consultant-name" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg">
+                </div>
+                <div>
+                    <label for="edit-consultant-persona" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ペルソナ</label>
+                    <textarea id="edit-consultant-persona" rows="6" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg"></textarea>
+                </div>
+            </div>
+             <div class="p-4 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
+                <button id="cancel-edit-consultant-btn" class="py-2 px-4 bg-slate-500 text-white font-semibold rounded-lg hover:bg-slate-600">キャンセル</button>
+                <button id="confirm-edit-consultant-btn" class="py-2 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700">変更を保存</button>
+            </div>
+        </div>
+    </div>
+    <div id="edit-user-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-xl m-4">
+            <div class="p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">カスタムユーザーを編集</h2>
+            </div>
+            <div class="p-6 space-y-4">
+                 <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">アイコン</label>
+                    <div class="flex items-center space-x-3">
+                        <div id="edit-user-icon-preview" class="w-10 h-10 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-500 dark:text-slate-400 text-2xl"></div>
+                        <button class="change-edit-persona-icon-btn py-1 px-3 bg-slate-200 dark:bg-slate-600 text-sm rounded-md" data-target-id="edit-user">変更</button>
+                    </div>
+                </div>
+                <div>
+                    <label for="edit-user-preset-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">プリセット名</label>
+                    <input type="text" id="edit-user-preset-name" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg">
+                </div>
+                <div>
+                    <label for="edit-user-name" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ユーザー名</label>
+                    <input type="text" id="edit-user-name" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg">
+                </div>
+                <div>
+                    <label for="edit-user-persona" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ペルソナ</label>
+                    <textarea id="edit-user-persona" rows="6" class="w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg"></textarea>
+                </div>
+            </div>
+             <div class="p-4 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-end space-x-3">
+                <button id="cancel-edit-user-btn" class="py-2 px-4 bg-slate-500 text-white font-semibold rounded-lg hover:bg-slate-600">キャンセル</button>
+                <button id="confirm-edit-user-btn" class="py-2 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700">変更を保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- How to Use Modal -->
+    <div id="how-to-use-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black bg-opacity-60">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col m-4">
+            <div class="flex justify-between items-center p-5 border-b dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">使い方ガイド</h2>
+                <button id="close-how-to-use-modal-btn" class="p-2 -mr-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 rounded-full">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto markdown-content">
+                <h3 class="!mt-0 text-xl font-bold">AIコンサル掲示板へようこそ！</h3>
+                <p>このアプリケーションは、設定した役割（ペルソナ）を持つ複数のAIキャラクターが、特定のトピックについて自動で議論を進めるシミュレーションツールです。</p>
+                <hr>
+                <h3 class="text-lg font-semibold">1. 基本的な使い方</h3>
+                <p>まずは、議論を開始するまでの最も基本的な流れです。</p>
+                <ol class="list-decimal list-inside space-y-1">
+                    <li><strong>設定パネルを開く</strong>: 画面左上のハンバーガーメニュー（三本線のアイコン）をクリックして、設定パネルを開きます。</li>
+                    <li><strong>トピックを決める</strong>: 「議論のトピック（スレタイ）」に、AIたちに議論させたいテーマを入力します。（例：「テレワークを成功させるコツ」）</li>
+                    <li><strong>議論を開始する</strong>: 設定パネルの一番下にある「議論開始」ボタンをクリックします。</li>
+                    <li><strong>議論を眺める</strong>: 掲示板画面で、AIたちが自動で議論を始めます。議論を止めたい場合は、同じ場所にある「議論停止」ボタンを押してください。</li>
+                </ol>
+                <hr>
+                <h3 class="text-lg font-semibold">2. AIの設定（ペルソナ設定）</h3>
+                <p>このツールの面白いところは、登場するAIの性格や役割を自由に設定できる点です。</p>
+                <h4 class="font-semibold">コンサルタントAIの設定</h4>
+                <ul class="list-disc list-inside space-y-1">
+                    <li><strong>追加</strong>: 設定パネルの「議論にコンサルタントを追加」ボタンで、議論に参加するコンサルタントを増やせます。（最低1名は必要です）</li>
+                    <li><strong>役割の選択</strong>: 各コンサルタントのブロックにある「コンサルタントの種類」から、プリセットされた役割を選べます。</li>
+                    <li><strong>カスタマイズ</strong>: 名前やペルソナ（役割設定）のテキストエリアを直接編集することで、オリジナルのAIキャラクターを作成できます。</li>
+                    <li><strong>アイコンの変更</strong>: アイコン画像の横にある「変更」ボタンから、キャラクターのアイコンを自由に変更できます。</li>
+                </ul>
+                <h4 class="font-semibold mt-2">ユーザーAIの設定</h4>
+                <ul class="list-disc list-inside space-y-1">
+                    <li>議論の質問役となる「ユーザーAI」の役割も設定できます。設定方法はコンサルタントAIと同じです。</li>
+                </ul>
+                <h4 class="font-semibold mt-2">ペルソナの自動生成</h4>
+                <ul class="list-disc list-inside space-y-1">
+                    <li>「キーワードから自動生成」ボタンを押すと、入力したキーワードに合った名前とペルソナをAIが自動で考えてくれます。キャラクター設定に困ったときに便利です。</li>
+                </ul>
+                <hr>
+                <h3 class="text-lg font-semibold">3. 議論の制御</h3>
+                <p>議論の進め方を細かくコントロールできます。</p>
+                <ul class="list-disc list-inside space-y-1">
+                    <li><strong>議論モード</strong>: 対話形式、順番形式、AI指名形式から議論の進行スタイルを選べます。</li>
+                    <li><strong>最大応答文字数</strong>: AIが一度に話す文字数のおおよその上限です。</li>
+                    <li><strong>最大レス数</strong>: 設定した数に達すると、議論は自動で停止します。</li>
+                    <li><strong>保持するレス数</strong>: AIが文脈を理解するために記憶しておく、直近の会話の数です。</li>
+                </ul>
+                <hr>
+                <h3 class="text-lg font-semibold">4. 便利な機能</h3>
+                <ul class="list-disc list-inside space-y-1">
+                    <li><strong>要約する</strong>: 議論が長くなったときに、それまでの流れをAIがまとめてくれます。</li>
+                    <li><strong>スレッド管理（保存・復元）</strong>: 現在の設定や議論の途中経過を保存し、後から復元できます。</li>
+                    <li><strong>エクスポート</strong>: 議論の全データを、JSON形式やDAT形式でダウンロードします。</li>
+                </ul>
+                 <hr>
+                <h3 class="text-lg font-semibold">5. APIキーの設定</h3>
+                 <p>このアプリケーションは、GoogleのGemini APIを利用してAIの応答を生成しています。設定パネル下部の「Gemini API 設定」から、ご自身のAPIキーを入力して保存してください。</p>
+            </div>
+             <div class="p-4 border-t dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 text-right rounded-b-lg">
+                <button id="close-how-to-use-modal-btn-bottom" class="py-2 px-4 bg-slate-600 text-white font-semibold rounded-lg shadow-md hover:bg-slate-700">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- スクロール & 操作コントローラー -->
+    <div id="scroll-controller" class="fixed top-1/2 -translate-y-1/2 right-6 z-20 flex flex-col items-center space-y-2 bg-slate-100/60 dark:bg-slate-800/60 backdrop-blur-sm p-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-lg">
+        <button id="scroll-to-top-btn" title="一番上へ" class="w-11 h-11 flex items-center justify-center bg-white/80 dark:bg-slate-700/80 backdrop-blur-sm text-slate-600 dark:text-slate-300 rounded-full shadow-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+        </button>
+        <button id="scroll-controller-toggle-btn" title="議論開始" class="w-14 h-14 flex items-center justify-center bg-indigo-600 text-white rounded-full shadow-xl hover:bg-indigo-700 transition-colors">
+            <svg id="scroll-controller-play-icon" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="scroll-controller-stop-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none" class="hidden"><rect x="6" y="6" width="12" height="12"></rect></svg>
+        </button>
+        <button id="scroll-to-bottom-btn" title="一番下へ" class="w-11 h-11 flex items-center justify-center bg-white/80 dark:bg-slate-700/80 backdrop-blur-sm text-slate-600 dark:text-slate-300 rounded-full shadow-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+    </div>
+
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // DOM Elements
+        const startBtn = document.getElementById('start-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const summarizeBtn = document.getElementById('summarize-btn');
+        const saveBtn = document.getElementById('save-btn');
+        const loadBtn = document.getElementById('load-btn');
+        const downloadJsonBtn = document.getElementById('download-json-btn');
+        const downloadDatBtn = document.getElementById('download-dat-btn');
+        const chatContainer = document.getElementById('chat-container');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const settingsPanel = document.getElementById('settings-panel');
+        const allSettingsInputs = settingsPanel.querySelectorAll('input, textarea, select');
+        const openMenuBtn = document.getElementById('open-menu-btn');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const menuOverlay = document.getElementById('menu-overlay');
+        const topicInput = document.getElementById('topic');
+        const threadTitleContainer = document.getElementById('thread-title-container');
+        const threadTitleText = document.getElementById('thread-title-text');
+        const inputTokenCountEl = document.getElementById('input-token-count');
+        const outputTokenCountEl = document.getElementById('output-token-count');
+        const maxCharsSlider = document.getElementById('max-chars');
+        const maxCharsValue = document.getElementById('max-chars-value');
+        const historyLengthSlider = document.getElementById('history-length');
+        const historyLengthValue = document.getElementById('history-length-value');
+        const userInputContainer = document.getElementById('user-input-container');
+        const userMessageInput = document.getElementById('user-message-input');
+        const sendMessageBtn = document.getElementById('send-message-btn');
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        const themeIconLight = document.getElementById('theme-icon-light');
+        const themeIconDark = document.getElementById('theme-icon-dark');
+        const fileUploadInput = document.getElementById('file-upload-input');
+        const attachFileBtn = document.getElementById('attach-file-btn');
+        const filePreviewContainer = document.getElementById('file-preview-container');
+        const soundToggle = document.getElementById('sound-toggle');
+        const backgroundIconToggle = document.getElementById('background-icon-toggle');
+        const backgroundIconOptionsContainer = document.getElementById('background-icon-options-container');
+        const backgroundIconOpacitySlider = document.getElementById('background-icon-opacity');
+        const backgroundIconOpacityValue = document.getElementById('background-icon-opacity-value');
+        const backgroundIconPositionSelect = document.getElementById('background-icon-position');
+        const scrollController = document.getElementById('scroll-controller');
+        const scrollToTopBtn = document.getElementById('scroll-to-top-btn');
+        const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+        const scrollControllerToggleBtn = document.getElementById('scroll-controller-toggle-btn');
+        const scrollControllerPlayIcon = document.getElementById('scroll-controller-play-icon');
+        const scrollControllerStopIcon = document.getElementById('scroll-controller-stop-icon');
+        const controllerToggle = document.getElementById('controller-toggle');
+
+        // User AI Elements
+        const userTypeSelect = document.getElementById('user-type');
+        const userNameInput = document.getElementById('user-name');
+        const userPersonaTextarea = document.getElementById('user-persona');
+        const changeUserIconBtn = document.getElementById('change-user-icon-btn');
+
+        // API Key Elements
+        const geminiApiKeyInput = document.getElementById('gemini-api-key-input');
+        const saveGeminiApiKeyBtn = document.getElementById('save-gemini-api-key-btn');
+
+
+        // Modal Elements
+        const iconPickerModal = document.getElementById('icon-picker-modal'), closeIconPickerBtn = document.getElementById('close-icon-picker-btn'), iconGrid = document.getElementById('icon-grid'), iconUploadBtn = document.getElementById('icon-upload-btn'), iconUploadInput = document.getElementById('icon-upload-input'), iconUrlInput = document.getElementById('icon-url-input'), iconUrlLoadBtn = document.getElementById('icon-url-load-btn'), iconPasteBtn = document.getElementById('icon-paste-btn');
+        const summaryModal = document.getElementById('summary-modal'), closeSummaryModalBtn = document.getElementById('close-summary-modal-btn'), closeSummaryModalBtnBottom = document.getElementById('close-summary-modal-btn-bottom'), summaryLoading = document.getElementById('summary-loading'), summaryContent = document.getElementById('summary-content'), downloadSummaryTxtBtn = document.getElementById('download-summary-txt-btn'), downloadSummaryMdBtn = document.getElementById('download-summary-md-btn');
+        const loadModal = document.getElementById('load-modal'), closeLoadModalBtn = document.getElementById('close-load-modal-btn'), closeLoadModalBtnBottom = document.getElementById('close-load-modal-btn-bottom');
+        const saveModal = document.getElementById('save-modal'), cancelSaveBtn = document.getElementById('cancel-save-btn'), confirmSaveBtn = document.getElementById('confirm-save-btn'), saveNameInput = document.getElementById('save-name-input');
+        const confirmModal = document.getElementById('confirm-modal'), confirmMessage = document.getElementById('confirm-message'), confirmYesBtn = document.getElementById('confirm-yes-btn'), confirmNoBtn = document.getElementById('confirm-no-btn');
+        // Consultant Modals
+        const manageConsultantsModal = document.getElementById('manage-consultants-modal'), closeManageConsultantsBtn = document.getElementById('close-manage-consultants-btn'), closeManageConsultantsBtnBottom = document.getElementById('close-manage-consultants-btn-bottom'), customConsultantListContainer = document.getElementById('custom-consultant-list-container'), addNewConsultantBtn = document.getElementById('add-new-consultant-btn'), newConsultantPresetNameInput = document.getElementById('new-consultant-preset-name'), newConsultantNameInput = document.getElementById('new-consultant-name'), newConsultantPersonaTextarea = document.getElementById('new-consultant-persona');
+        const editConsultantModal = document.getElementById('edit-consultant-modal'), cancelEditConsultantBtn = document.getElementById('cancel-edit-consultant-btn'), confirmEditConsultantBtn = document.getElementById('confirm-edit-consultant-btn'), editConsultantPresetNameInput = document.getElementById('edit-consultant-preset-name'), editConsultantNameInput = document.getElementById('edit-consultant-name'), editConsultantPersonaTextarea = document.getElementById('edit-consultant-persona');
+        // User Modals
+        const manageUsersModal = document.getElementById('manage-users-modal'), manageUsersBtn = document.getElementById('manage-users-btn'), closeManageUsersBtn = document.getElementById('close-manage-users-btn'), closeManageUsersBtnBottom = document.getElementById('close-manage-users-btn-bottom'), customUserListContainer = document.getElementById('custom-user-list-container'), addNewUserBtn = document.getElementById('add-new-user-btn'), newUserPresetNameInput = document.getElementById('new-user-preset-name'), newUserNameInput = document.getElementById('new-user-name'), newUserPersonaTextarea = document.getElementById('new-user-persona');
+        const editUserModal = document.getElementById('edit-user-modal'), cancelEditUserBtn = document.getElementById('cancel-edit-user-btn'), confirmEditUserBtn = document.getElementById('confirm-edit-user-btn'), editUserPresetNameInput = document.getElementById('edit-user-preset-name'), editUserNameInput = document.getElementById('edit-user-name'), editUserPersonaTextarea = document.getElementById('edit-user-persona');
+        // Persona Generation Modal
+        const generatePersonaModal = document.getElementById('generate-persona-modal'), generatePersonaInManagerBtn = document.getElementById('generate-persona-in-manager-btn'), generateUserPersonaInManagerBtn = document.getElementById('generate-user-persona-in-manager-btn'), cancelGeneratePersonaBtn = document.getElementById('cancel-generate-persona-btn'), confirmGeneratePersonaBtn = document.getElementById('confirm-generate-persona-btn'), personaKeywordsInput = document.getElementById('persona-keywords-input'), personaGenerationSpinner = document.getElementById('persona-generation-spinner');
+        
+        // How to Use Modal Elements
+        const howToUseModal = document.getElementById('how-to-use-modal'),
+              openHowToUseBtn = document.getElementById('open-how-to-use-btn'),
+              closeHowToUseModalBtn = document.getElementById('close-how-to-use-modal-btn'),
+              closeHowToUseModalBtnBottom = document.getElementById('close-how-to-use-modal-btn-bottom');
+
+        // State
+        const IS_CANVAS_ENV = window.self !== window.top;
+        let isRunning = false, conversationHistory = [], currentTurn = 0, postCounter = 1;
+        let totalTokensUsed = 0, totalInputTokensUsed = 0, totalOutputTokensUsed = 0;
+        let participants = [];
+        let editingConsultantKey = null, editingUserKey = null, iconPickerTargetId = null;
+        let currentSummaryMarkdown = '';
+        let personaGenerationTarget = 'consultant'; // 'consultant' or 'user'
+        let attachedFiles = [];
+        let newConsultantIconKey = 'default', newUserIconKey = 'default';
+
+        // --- Helper Functions ---
+        function resizeImageFromSrc(src, maxDimension = 512) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                if (src.startsWith('http')) {
+                    img.crossOrigin = "Anonymous";
+                }
+                img.onload = () => {
+                    let { width, height } = img;
+                    if (width > maxDimension || height > maxDimension) {
+                        if (width > height) {
+                            height = Math.round(height * (maxDimension / width));
+                            width = maxDimension;
+                        } else {
+                            width = Math.round(width * (maxDimension / height));
+                            height = maxDimension;
+                        }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.9));
+                };
+                img.onerror = () => reject(new Error('画像の読み込みに失敗しました。URLが正しいか、CORSポリシーが許可されているか確認してください。'));
+                img.src = src;
+            });
+        }
+        function resizeImage(file, maxDimension = 512) {
+             return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    resizeImageFromSrc(e.target.result, maxDimension)
+                        .then(resolve)
+                        .catch(reject);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        function saveObjectToStorage(key, obj) { try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { console.error("Failed to save to localStorage", e); } }
+        function loadObjectFromStorage(key) { try { const data = localStorage.getItem(key); return data ? JSON.parse(data) : {}; } catch (e) { console.error("Failed to load from localStorage", e); return {}; } }
+        const loadCustomPersonas = (key) => loadObjectFromStorage(key);
+        const saveCustomPersonas = (key, personas) => saveObjectToStorage(key, personas);
+        function formatBytes(bytes, decimals = 2) { if (!+bytes) return '0 Bytes'; const k = 1024; const dm = decimals < 0 ? 0 : decimals; const sizes = ["Bytes", "KB", "MB", "GB", "TB"]; const i = Math.floor(Math.log(bytes) / Math.log(k)); return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`; }
+        function readFileAsDataURL(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
+        function readFileAsText(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsText(file); }); }
+        function removeFile(fileToRemove) { attachedFiles = attachedFiles.filter(file => file !== fileToRemove); renderFilePreviews(); }
+
+        // API & Storage Constants
+        let apiKey = "";
+        const CUSTOM_CONSULTANTS_KEY = 'aiConsultingCustomConsultants';
+        const CUSTOM_USERS_KEY = 'aiConsultingCustomUsers';
+        const SAVED_THREADS_KEY = 'aiConsultingSaves';
+        const settingsIds = ['topic', 'max-chars', 'max-posts', 'history-length', 'background-icon-opacity', 'background-icon-position', 'gemini-model-select'];
+
+        // Sound Effect
+        const synth = new Tone.MembraneSynth().toDestination();
+
+        let tokenClient;
+        
+        // --- Icon Presets ---
+        const iconPresets = {
+            default: '👤',
+            professor: '🧑‍🏫',
+            business: '👔',
+            coach: '💪',
+            developer: '💻',
+            beginner: '🤔',
+            skeptic: '🧐',
+            strategy: '📈',
+            human: '😊'
+        };
+
+        // --- Persona Presets ---
+        const consultantPresets = {
+            ai_side_hustle: {
+                title: "AI副業コンサルタント", name: "プロフェッサーA", icon: 'professor', persona: `あなたは、AIを活用した副業について深い知識を持つ経験豊富なコンサルタントです。最新のAIトレンドや具体的な収益化の方法に精通しており、相談者に対して、論理的かつ具体的なアドバイスを提供します。常に冷静で、プロフェッショナルな口調を保ちます。\n複雑なトピックについては、一度にすべてを説明するのではなく、複数の返信に分けて段階的に説明することを心がけてください。`
+            },
+            career_consultant: {
+                title: "キャリア相談コンサルタント", name: "キャリアアドバイザー田中", icon: 'business', persona: `あなたは、キャリア相談のプロフェッショナルです。転職、スキルアップ、社内でのキャリアパス形成など、働く人のあらゆる悩みに寄り添います。相談者の強みや価値観を引き出し、具体的で実行可能なアクションプランを一緒に考えることを得意とします。穏やかで聞き上手な口調で対話を進めます。`
+            },
+            business_strategy: {
+                title: "経営戦略コンサルタント", name: "経営ストラテジスト高橋", icon: 'strategy', persona: `あなたは、鋭い分析眼を持つ経営戦略コンサルタントです。新規事業の立ち上げ、マーケティング戦略、資金調達、組織改革など、企業の成長に関する課題を専門としています。データに基づいた客観的な視点から、厳しい指摘も辞さずに本質的なアドバイスを提供します。`
+            },
+            life_coach: {
+                title: "自己啓発コーチ", name: "ライフコーチSato", icon: 'coach', persona: `あなたは、個人の目標達成と自己実現をサポートするライフコーチです。相談者が本当に望む人生を見つける手助けをし、モチベーションの維持、習慣化のテクニック、時間管理術などを教えます。常にポジティブで、相談者の可能性を信じ、勇気づけるような言葉を選びます。`
+            }
+        };
+        const userPresets = {
+            beginner: {
+                title: "初心者", name: "ユウキ", icon: 'beginner', persona: `あなたは、会社員として働きながら、AIを使った副業に興味を持ち始めたばかりの20代の若者です。プログラミングの経験は少しありますが、AIで何ができるのか、どうやって収入に繋げれば良いのか具体的なイメージは持てていません。情熱はありますが、少し不安も抱えています。専門家に対して、丁寧な言葉遣いで質問します。`
+            },
+            skeptic: {
+                title: "懐疑的な中級者", name: "マナブ", icon: 'skeptic', persona: `あなたは、テクノロジー業界で働く30代の会社員です。AIに関するニュースは一通り追っており、基本的な知識はありますが、その実用性や収益性については少し懐疑的です。コンサルタントに対して、具体的で根拠のある説明を求め、納得できない点については鋭く質問します。`
+            },
+            developer: {
+                title: "経験豊富な開発者", name: "エンジニア佐藤", icon: 'developer', persona: `あなたは、10年以上の経験を持つソフトウェア開発者です。技術的な詳細に深い興味があり、AIモデルの仕組みやAPIの具体的な使い方について専門的な質問をします。抽象的な話よりも、コードレベルで議論できるような、技術的に深い対話を好みます。`
+            }
+        };
+
+        // --- UI Update Functions ---
+        const updateMaxCharsDisplay = () => { if(maxCharsSlider && maxCharsValue) maxCharsValue.textContent = maxCharsSlider.value; };
+        const updateHistoryLengthDisplay = () => { if(historyLengthSlider && historyLengthValue) historyLengthValue.textContent = historyLengthSlider.value; };
+        
+        function updateThreadTitle() {
+            if (threadTitleText && topicInput) {
+                const newTitle = topicInput.value || '無題のスレッド';
+                threadTitleText.textContent = newTitle;
+                document.title = `${newTitle} - AI コンサル掲示板`;
+            }
+        }
+        
+        function updateTokenDisplay() {
+            if (inputTokenCountEl) inputTokenCountEl.textContent = totalInputTokensUsed.toLocaleString();
+            if (outputTokenCountEl) outputTokenCountEl.textContent = totalOutputTokensUsed.toLocaleString();
+        }
+
+        function updateBgIconOpacity() {
+            const opacity = parseFloat(backgroundIconOpacitySlider.value);
+            document.documentElement.style.setProperty('--bg-icon-opacity', opacity);
+            backgroundIconOpacityValue.textContent = `${Math.round(opacity * 100)}%`;
+        }
+        function toggleIconOptionsVisibility() {
+            if (backgroundIconToggle.checked) {
+                backgroundIconOptionsContainer.classList.remove('hidden');
+            } else {
+                backgroundIconOptionsContainer.classList.add('hidden');
+            }
+        }
+
+        function renderIconPreview(previewEl, iconValue) {
+            if (!previewEl) return;
+            previewEl.innerHTML = ''; // Clear previous content
+            if (iconValue && iconValue.startsWith('data:image')) {
+                const img = document.createElement('img');
+                img.src = iconValue;
+                img.className = 'w-full h-full object-cover rounded-full';
+                previewEl.appendChild(img);
+            } else {
+                previewEl.textContent = iconPresets[iconValue] || iconValue || iconPresets.default;
+            }
+        }
+
+        // --- Generic Persona Functions ---
+        function populatePersonaDropdown(selectEl, presets, customPersonas) {
+            selectEl.innerHTML = ''; // Clear existing options
+            const defaultGroup = document.createElement('optgroup');
+            defaultGroup.label = 'デフォルト';
+            for (const key in presets) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = presets[key].title;
+                defaultGroup.appendChild(option);
+            }
+            selectEl.appendChild(defaultGroup);
+
+            if (Object.keys(customPersonas).length > 0) {
+                const customGroup = document.createElement('optgroup');
+                customGroup.label = 'カスタム';
+                for (const key in customPersonas) {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = customPersonas[key].title;
+                    customGroup.appendChild(option);
+                }
+                selectEl.appendChild(customGroup);
+            }
+        }
+        
+        function updatePersonaFields(selectEl, nameInput, personaTextarea, presets, customPersonas) {
+            const allPersonas = { ...presets, ...customPersonas };
+            const selectedKey = selectEl.value;
+            const persona = allPersonas[selectedKey];
+            
+            let targetNameInput = nameInput, targetPersonaTextarea = personaTextarea, targetIconPreview;
+
+            if (!nameInput && !personaTextarea) { // Consultant case
+                const block = selectEl.closest('.consultant-block');
+                if(block) {
+                    const id = block.dataset.id;
+                    targetNameInput = block.querySelector(`#consultant-name-${id}`);
+                    targetPersonaTextarea = block.querySelector(`#consultant-persona-${id}`);
+                    targetIconPreview = block.querySelector(`#consultant-icon-preview-${id}`);
+                }
+            } else { // User case
+                targetIconPreview = document.getElementById('user-icon-preview');
+            }
+
+            if (persona) {
+                if(targetNameInput) targetNameInput.value = persona.name;
+                if(targetPersonaTextarea) targetPersonaTextarea.value = persona.persona;
+                if(targetIconPreview) {
+                    const iconValue = persona.icon || 'default';
+                    targetIconPreview.dataset.iconValue = iconValue;
+                    renderIconPreview(targetIconPreview, iconValue);
+                }
+            }
+        }
+
+        // --- Menu Toggle Logic ---
+        const openMenu = () => { settingsPanel.classList.remove('-translate-x-full'); menuOverlay.classList.remove('hidden'); };
+        const closeMenu = () => { settingsPanel.classList.add('-translate-x-full'); menuOverlay.classList.add('hidden'); };
+        openMenuBtn.addEventListener('click', openMenu);
+        closeMenuBtn.addEventListener('click', closeMenu);
+        menuOverlay.addEventListener('click', closeMenu);
+        
+        // --- Modal Logic ---
+        const setupModal = (modal, openTriggers, closeTriggers) => {
+            if (!modal) return;
+            const open = () => modal.classList.replace('hidden', 'flex');
+            const close = () => modal.classList.replace('flex', 'hidden');
+            openTriggers.forEach(btn => {
+                if (btn) btn.addEventListener('click', open)
+            });
+            closeTriggers.forEach(btn => {
+                if (btn) btn.addEventListener('click', close)
+            });
+        };
+
+        summarizeBtn.addEventListener('click', summarizeConversation);
+        setupModal(summaryModal, [], [closeSummaryModalBtn, closeSummaryModalBtnBottom]);
+        setupModal(loadModal, [loadBtn], [closeLoadModalBtn, closeLoadModalBtnBottom]);
+        setupModal(saveModal, [saveBtn], [cancelSaveBtn]);
+        setupModal(confirmModal, [], [confirmNoBtn]); // Opened programmatically
+        setupModal(iconPickerModal, [], [closeIconPickerBtn]);
+        setupModal(manageConsultantsModal, [], [closeManageConsultantsBtn, closeManageConsultantsBtnBottom]);
+        setupModal(manageUsersModal, [manageUsersBtn], [closeManageUsersBtn, closeManageUsersBtnBottom]);
+        setupModal(generatePersonaModal, [generatePersonaInManagerBtn, generateUserPersonaInManagerBtn], [cancelGeneratePersonaBtn]);
+        setupModal(editConsultantModal, [], [cancelEditConsultantBtn]);
+        setupModal(editUserModal, [], [cancelEditUserBtn]);
+        setupModal(howToUseModal, [openHowToUseBtn], [closeHowToUseModalBtn, closeHowToUseModalBtnBottom]);
+        maxCharsSlider.addEventListener('input', updateMaxCharsDisplay);
+        historyLengthSlider.addEventListener('input', updateHistoryLengthDisplay);
+
+
+        // --- Main App Logic ---
+        startBtn.addEventListener('click', () => { if (isRunning) stopConversation(); else startConversation(); });
+        clearBtn.addEventListener('click', () => { if (isRunning) stopConversation(); clearThread(); });
+        document.getElementById('add-consultant-btn').addEventListener('click', () => addConsultantBlock());
+
+        function clearThread() {
+            chatContainer.querySelectorAll('.post, .system-message').forEach(el => el.remove());
+
+            let initialMessage = chatContainer.querySelector('.initial-message');
+            if (!initialMessage) {
+                initialMessage = document.createElement('div');
+                initialMessage.className = 'initial-message text-center p-8 text-slate-500 dark:text-slate-400';
+                initialMessage.innerHTML = `<h2 class="text-xl font-semibold mb-2">AIコンサル掲示板</h2><p>「議論開始」ボタンを押すと、AI同士の議論が始まります。</p>`;
+                chatContainer.appendChild(initialMessage);
+            }
+            initialMessage.classList.remove('hidden');
+
+            threadTitleContainer.classList.add('hidden');
+
+            conversationHistory = []; postCounter = 1; 
+            totalTokensUsed = 0; totalInputTokensUsed = 0; totalOutputTokensUsed = 0;
+            updateTokenDisplay();
+            toggleSettings(false);
+            userInputContainer.classList.remove('hidden');
+        }
+        
+        function toggleSettings(disabled) { 
+            allSettingsInputs.forEach(el => el.disabled = disabled); 
+            userInputContainer.querySelectorAll('textarea, button').forEach(el => el.disabled = disabled);
+            document.getElementById('add-consultant-btn').disabled = disabled;
+            document.querySelectorAll('.remove-consultant-btn').forEach(btn => btn.disabled = disabled);
+            chatContainer.querySelectorAll('.edit-btn, .delete-btn').forEach(btn => btn.disabled = disabled);
+        }
+
+        function buildParticipants() {
+            participants = [];
+            const userIconPreview = document.getElementById('user-icon-preview');
+            participants.push({
+                type: 'user', name: userNameInput.value, persona: userPersonaTextarea.value, icon: userIconPreview.dataset.iconValue || 'beginner'
+            });
+            document.querySelectorAll('.consultant-block').forEach(block => {
+                const id = block.dataset.id;
+                const iconPreview = block.querySelector(`#consultant-icon-preview-${id}`);
+                participants.push({
+                    type: 'consultant', id: id, name: block.querySelector(`#consultant-name-${id}`).value, persona: block.querySelector(`#consultant-persona-${id}`).value, icon: iconPreview.dataset.iconValue || 'professor'
+                });
+            });
+        }
+
+        function startConversation() {
+            if (!apiKey && !IS_CANVAS_ENV) {
+                addSystemMessage("Gemini APIキーが設定されていません。設定パネルからキーを保存してください。");
+                openMenu();
+                return;
+            }
+            buildParticipants();
+            if (participants.length < 2) {
+                addSystemMessage("議論を開始するには、少なくとも1人のコンサルタントを設定してください。");
+                return;
+            }
+            isRunning = true;
+            startBtn.textContent = '議論停止';
+            startBtn.classList.replace('bg-indigo-600', 'bg-red-600');
+            startBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
+            scrollControllerToggleBtn.title = '議論停止';
+            scrollControllerToggleBtn.classList.replace('bg-indigo-600', 'bg-red-600');
+            scrollControllerToggleBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
+            scrollControllerPlayIcon.classList.add('hidden');
+            scrollControllerStopIcon.classList.remove('hidden');
+            toggleSettings(true); closeMenu();
+            userInputContainer.classList.add('hidden');
+            
+            if(conversationHistory.length === 0) {
+                 const topic = document.getElementById('topic').value;
+                 const firstUserMessage = `こんにちは。「${topic}」について相談させてください。`;
+                 const timestamp = Date.now();
+                 conversationHistory.push({ role: 'user', parts: [{ text: firstUserMessage }], timestamp: timestamp, participantIndex: 0, isHuman: true });
+                 addMessageToChat(userNameInput.value, firstUserMessage, 'user', timestamp, participants[0].icon);
+                 currentTurn = 1; // Start with the first consultant
+            }
+            runConversationLoop();
+        }
+
+        function stopConversation() {
+            isRunning = false;
+            startBtn.textContent = '議論開始';
+            startBtn.classList.replace('bg-red-600', 'bg-indigo-600');
+            startBtn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
+            scrollControllerToggleBtn.title = '議論開始';
+            scrollControllerToggleBtn.classList.replace('bg-red-600', 'bg-indigo-600');
+            scrollControllerToggleBtn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
+            scrollControllerPlayIcon.classList.remove('hidden');
+            scrollControllerStopIcon.classList.add('hidden');
+            loadingIndicator.classList.add('hidden'); 
+            toggleSettings(false);
+            userInputContainer.classList.remove('hidden');
+        }
+
+        function addMessageToChat(name, text, role, timestamp, iconValue) {
+            const initialMessage = chatContainer.querySelector('.initial-message');
+            if (initialMessage) initialMessage.remove();
+
+            threadTitleContainer.classList.remove('hidden');
+
+            if (soundToggle && soundToggle.checked) {
+                if (Tone.context.state !== 'running') {
+                    Tone.context.resume();
+                }
+                const now = Tone.now();
+                synth.triggerAttackRelease("C2", "8n", now);
+                synth.triggerAttackRelease("C2", "8n", now + 0.15);
+            }
+            
+            const postDiv = document.createElement('div');
+            postDiv.classList.add('post', 'group');
+            
+            const iconPosition = backgroundIconPositionSelect.value;
+            postDiv.classList.add(iconPosition === 'left' ? 'icon-pos-left' : 'icon-pos-right');
+
+            if (backgroundIconToggle.checked) {
+                postDiv.classList.add('show-bg-icon');
+            }
+
+            postDiv.dataset.timestamp = timestamp;
+            const date = timestamp ? new Date(timestamp) : new Date();
+            const formattedTimestamp = date.toLocaleString('ja-JP');
+
+            const nameColor = role === 'user' ? 'text-green-700 dark:text-green-400' : 'text-blue-700 dark:text-blue-400';
+            let roleText = (name === 'あなた') ? 'あなた' : (role === 'user' ? '相談者' : 'コンサルタント');
+            
+            const unsafeHtml = marked.parse(text, { breaks: true, gfm: true });
+            const cleanHtml = DOMPurify.sanitize(unsafeHtml);
+            
+            const editIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+            const deleteIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
+            
+            postDiv.innerHTML = `
+                <div style="position: relative; z-index: 1;">
+                    <div class="post-header flex justify-between items-center">
+                        <div>
+                            <span class="font-semibold">${postCounter}.</span>
+                            <span class="font-bold ${nameColor} ml-1">${name}</span>
+                            <span class="text-xs">(${roleText})</span>
+                            <span class="ml-2 text-xs">${formattedTimestamp}</span>
+                        </div>
+                        <div class="post-actions invisible group-hover:visible flex items-center space-x-2">
+                            <button title="編集" class="edit-btn p-1 text-slate-500 hover:text-sky-600 dark:text-slate-400 dark:hover:text-sky-400">${editIconSvg}</button>
+                            <button title="削除" class="delete-btn p-1 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400">${deleteIconSvg}</button>
+                        </div>
+                    </div>
+                    <div class="post-body markdown-content">${cleanHtml}</div>
+                </div>
+                <div class="post-background-icon"></div>`;
+            
+            const backgroundIconEl = postDiv.querySelector('.post-background-icon');
+            if (iconValue && iconValue.startsWith('data:image')) {
+                backgroundIconEl.classList.add('is-image');
+                backgroundIconEl.innerHTML = `<img src="${iconValue}">`;
+            } else {
+                backgroundIconEl.classList.remove('is-image');
+                backgroundIconEl.textContent = iconPresets[iconValue] || iconValue || '';
+            }
+
+            const editBtn = postDiv.querySelector('.edit-btn');
+            const deleteBtn = postDiv.querySelector('.delete-btn');
+
+            editBtn.addEventListener('click', () => toggleEditView(timestamp));
+            deleteBtn.addEventListener('click', () => deletePost(timestamp));
+
+            if (isRunning) {
+                editBtn.disabled = true;
+                deleteBtn.disabled = true;
+            }
+            
+            chatContainer.appendChild(postDiv); chatContainer.scrollTop = chatContainer.scrollHeight; postCounter++;
+        }
+        
+        function addSystemMessage(text) {
+            const systemDiv = document.createElement('div');
+            systemDiv.className = 'py-4 px-4 text-center text-sm text-slate-500 dark:text-slate-400 italic';
+            systemDiv.textContent = text;
+            chatContainer.appendChild(systemDiv); chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function generateContentWithRetry(payload) {
+            const model = document.getElementById('gemini-model-select').value;
+            for (let retries = 3, delay = 1000; retries > 0; retries--, delay *= 2) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) {
+                        if (response.status === 401 || response.status === 403) {
+                             if (IS_CANVAS_ENV) {
+                                const authError = new Error('API呼び出しに失敗しました。Canvas環境が正しく設定されていない可能性があります。');
+                                authError.isAuthError = true;
+                                throw authError;
+                             } else {
+                                const authError = new Error('APIキーが無効、または権限がありません(401/403)。');
+                                authError.isAuthError = true;
+                                throw authError;
+                             }
+                        }
+                        const errorText = await response.text();
+                        console.error("API Error:", errorText);
+                        throw new Error(`APIリクエストに失敗しました (HTTP ${response.status})。選択したモデルが機能をサポートしていない可能性があります。`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error('API call failed:', error);
+                    if (error.isAuthError || retries === 1) {
+                        throw error;
+                    }
+                    await new Promise(res => setTimeout(res, delay));
+                }
+            }
+        }
+        
+        async function summarizeConversation() {
+            if (conversationHistory.length < 2) { addSystemMessage("要約するには、議論をもう少し進めてください（2レス以上必要です）。"); return; }
+            if (!apiKey && !IS_CANVAS_ENV) { addSystemMessage("要約機能を利用するには、Gemini APIキーを設定してください。"); return; }
+            summaryModal.classList.replace('hidden', 'flex');
+            summaryLoading.classList.remove('hidden'); summaryContent.classList.add('hidden'); summaryContent.innerHTML = '';
+            
+            const transcript = conversationHistory.map(m => {
+                const participant = participants[m.participantIndex];
+                const name = participant.type === 'user' ? (m.isHuman ? 'あなた' : participant.name) : participant.name;
+                return `${name}: ${m.parts[0].text}`;
+            }).join('\n\n');
+            const summarizationPrompt = `以下の会話の要点を、箇条書きを使って分かりやすく要約してください。\n\n---\n\n${transcript}`;
+            const payload = { contents: [{ role: 'user', parts: [{ text: summarizationPrompt }] }], generationConfig: { "temperature": 0.2 }, safetySettings: [ { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" }, { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" }, { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }, { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" } ] };
+
+            try {
+                const result = await generateContentWithRetry(payload);
+                if(result?.usageMetadata) {
+                    totalInputTokensUsed += result.usageMetadata.promptTokenCount || 0;
+                    totalOutputTokensUsed += result.usageMetadata.candidatesTokenCount || 0;
+                    updateTokenDisplay();
+                }
+                let summaryText = "要約の生成に失敗しました。";
+                if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    summaryText = result.candidates[0].content.parts[0].text;
+                }
+                currentSummaryMarkdown = summaryText; // Store raw markdown for download
+                summaryContent.innerHTML = DOMPurify.sanitize(marked.parse(summaryText, { breaks: true, gfm: true }));
+            } catch (error) {
+                summaryContent.innerHTML = `<p class="text-red-600">エラーが発生しました: ${error.message}</p>`;
+            } finally {
+                summaryLoading.classList.add('hidden'); summaryContent.classList.remove('hidden');
+            }
+        }
+
+        async function getNextResponse(participant) {
+            const basePersona = participant.persona;
+            const maxChars = parseInt(maxCharsSlider.value, 10) || 1000;
+            const personaWithTokenLimit = `${basePersona}\n\n重要: 回答は必ず${maxChars}文字以内で、簡潔にまとめてください。`;
+            const maxHistoryMessages = parseInt(historyLengthSlider.value, 10) || 10;
+            let truncatedHistory = conversationHistory.slice(-maxHistoryMessages).map(({role, parts}) => ({role, parts}));
+
+            if (participant.type === 'user') {
+                 truncatedHistory.push({ role: 'user', parts: [{ text: '上記のコンサルタントの回答内容を踏まえて、あなたが疑問に思ったことや、さらに詳しく知りたいことについて、具体的な質問を一つしてください。' }] });
+            }
+
+            const payload = { contents: truncatedHistory, systemInstruction: { parts: [{ text: personaWithTokenLimit }] }, generationConfig: { "temperature": 0.7, "topK": 1, "topP": 1 }, safetySettings: [ { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" }, { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" }, { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" }, { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" } ] };
+
+            try {
+                const result = await generateContentWithRetry(payload);
+                const candidate = result?.candidates?.[0];
+                const usage = result?.usageMetadata || {};
+                const tokens = {
+                    input: usage.promptTokenCount || 0,
+                    output: usage.candidatesTokenCount || 0
+                };
+                if (candidate?.content?.parts?.[0]?.text) {
+                    if (candidate.finishReason === 'MAX_TOKENS') console.warn("Response truncated.");
+                    return { text: candidate.content.parts[0].text, tokens };
+                } else {
+                    let errorMessage = "申し訳ありません、応答を生成できませんでした。";
+                    if (result?.promptFeedback?.blockReason) errorMessage += ` 理由: ${result.promptFeedback.blockReason}`;
+                    else if (candidate?.finishReason && candidate.finishReason !== 'STOP') errorMessage += ` 理由: ${candidate.finishReason}`;
+                    return { text: errorMessage, tokens };
+                }
+            } catch (error) {
+                 console.error("Error fetching AI response:", error);
+                 return { text: `エラー: ${error.message}`, tokens: {input: 0, output: 0} };
+            }
+        }
+        
+        async function selectNextConsultant() {
+            const loadingIndicatorText = loadingIndicator.querySelector('p');
+            loadingIndicatorText.textContent = "次に回答するコンサルタントをAIが選んでいます...";
+            loadingIndicator.classList.remove('hidden');
+            const lastQuestion = conversationHistory[conversationHistory.length - 1].parts[0].text;
+            const consultantOptions = participants.slice(1).map((p, i) =>
+                `インデックス ${i + 1}: ${p.name} (専門分野: ${p.persona.substring(0, 150).replace(/\n/g, ' ')}...)`
+            ).join('\n');
+
+            const selectionSchema = {
+                type: 'OBJECT',
+                properties: {
+                    selectedIndex: {
+                        type: 'NUMBER',
+                        description: 'The 1-based index of the selected consultant from the provided list.'
+                    }
+                },
+                required: ['selectedIndex']
+            };
+
+            const selectionPrompt = `あなたは議論の司会者です。以下の質問に最も的確に答えられる専門家を、選択肢の中から一人選んでください。
+
+### 質問
+${lastQuestion}
+
+### 専門家の選択肢
+${consultantOptions}
+
+### 回答 (選択した専門家のインデックス番号をJSON形式で返してください):`;
+
+            const payload = {
+                contents: [{ parts: [{ text: selectionPrompt }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: selectionSchema,
+                },
+            };
+
+            try {
+                const result = await generateContentWithRetry(payload);
+                if (result?.usageMetadata) {
+                     totalInputTokensUsed += result.usageMetadata.promptTokenCount || 0;
+                     totalOutputTokensUsed += result.usageMetadata.candidatesTokenCount || 0;
+                     updateTokenDisplay();
+                }
+                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    const responseJson = JSON.parse(text);
+                    const selectedIndex = responseJson.selectedIndex;
+
+                    if (selectedIndex && typeof selectedIndex === 'number' && selectedIndex >= 1 && selectedIndex < participants.length) {
+                        loadingIndicatorText.textContent = `${participants[selectedIndex].name} が指名されました。`;
+                        return selectedIndex;
+                    }
+                }
+                throw new Error("AIからの指名が無効でした。");
+            } catch (error) {
+                console.error("AI selection failed:", error);
+                loadingIndicator.classList.add('hidden');
+                addSystemMessage("AIによる指名に失敗したため、順番に回答します。");
+
+                let lastConsultantIndex = 0;
+                for (let i = conversationHistory.length - 2; i >= 0; i--) {
+                    if (conversationHistory[i].participantIndex > 0) {
+                        lastConsultantIndex = conversationHistory[i].participantIndex;
+                        break;
+                    }
+                }
+                let nextIndex = lastConsultantIndex + 1;
+                if (nextIndex >= participants.length) nextIndex = 1;
+                return nextIndex;
+            }
+        }
+
+
+        async function runConversationLoop() {
+            if (!isRunning) return;
+            if (postCounter > (parseInt(document.getElementById('max-posts').value, 10) || 20)) {
+                addSystemMessage("設定された最大レス数に達したため、議論を停止しました。"); stopConversation(); return;
+            }
+
+            const currentParticipant = participants[currentTurn];
+            // Skip if it's a human's turn
+            if (currentParticipant.type === 'user' && conversationHistory.length > 0 && conversationHistory[conversationHistory.length-1].isHuman) {
+                return;
+            }
+
+            const loadingIndicatorText = loadingIndicator.querySelector('p');
+            if (loadingIndicator.classList.contains('hidden')) {
+                loadingIndicatorText.textContent = 'AIが応答を生成中です...';
+                loadingIndicator.classList.remove('hidden');
+            } else {
+                loadingIndicatorText.textContent += ' 応答を生成中です...';
+            }
+
+            const response = await getNextResponse(currentParticipant);
+            totalInputTokensUsed += response.tokens.input;
+            totalOutputTokensUsed += response.tokens.output;
+            updateTokenDisplay();
+            if (!isRunning) { loadingIndicator.classList.add('hidden'); return; }
+            loadingIndicator.classList.add('hidden');
+            
+            // APIエラーの場合は処理を中断し、チャットや履歴に書き込まない
+            if (response.text.includes("エラー") || response.text.includes("失敗しました")) {
+                addSystemMessage(response.text); // エラー内容をシステムメッセージとして表示
+                stopConversation();
+                return; // ループを中断
+            }
+            
+            const timestamp = Date.now();
+            const role = currentParticipant.type === 'user' ? 'user' : 'model';
+            addMessageToChat(currentParticipant.name, response.text, role, timestamp, currentParticipant.icon);
+
+            const lastTurn = currentTurn;
+            const roleForHistory = currentParticipant.type === 'user' ? 'user' : 'model';
+            conversationHistory.push({ role: roleForHistory, parts: [{ text: response.text }], timestamp: timestamp, participantIndex: currentTurn });
+            
+            // Determine the next participant
+            const discussionMode = document.querySelector('input[name="discussion-mode"]:checked').value;
+            
+            switch (discussionMode) {
+                case 'sequential':
+                    if (lastTurn === participants.length - 1) { // Last consultant spoke
+                        currentTurn = 0; // User AI's turn
+                    } else if (lastTurn === 0 && conversationHistory.length > 1 && !conversationHistory[conversationHistory.length-1].isHuman) { // User AI spoke
+                        currentTurn = 1; // C1's turn
+                    } else {
+                        currentTurn = lastTurn + 1;
+                    }
+                    break;
+
+                case 'autonomous':
+                    if (lastTurn > 0) { // A consultant just spoke
+                        currentTurn = 0; // User AI's turn to ask
+                    } else { // User AI (or human) just spoke
+                        currentTurn = await selectNextConsultant();
+                    }
+                    break;
+
+                case 'interactive':
+                default:
+                    if (lastTurn > 0) { // A consultant just spoke
+                        currentTurn = 0; // User AI's turn to ask
+                    } else { // User AI (or human) just spoke
+                        let lastConsultantIndex = 0;
+                        for (let i = conversationHistory.length - 1; i >= 0; i--) {
+                            if (conversationHistory[i].participantIndex > 0) {
+                                lastConsultantIndex = conversationHistory[i].participantIndex;
+                                break;
+                            }
+                        }
+                        currentTurn = lastConsultantIndex + 1;
+                        if (currentTurn >= participants.length) {
+                            currentTurn = 1; 
+                        }
+                    }
+                    break;
+            }
+
+            setTimeout(runConversationLoop, 1000);
+        }
+
+        async function sendUserMessage() {
+            const text = userMessageInput.value.trim();
+            if (!text && attachedFiles.length === 0) return;
+            if (isRunning) return;
+
+            sendMessageBtn.disabled = true;
+            attachFileBtn.disabled = true;
+
+            let combinedMessage = text;
+            
+            if (attachedFiles.length > 0) {
+                const fileContents = await Promise.all(attachedFiles.map(file => {
+                    if (file.type.startsWith('image/')) {
+                        return readFileAsDataURL(file).then(dataUrl => `\n![添付画像: ${file.name}](${dataUrl})`);
+                    } else if (file.type.startsWith('text/')) {
+                        return readFileAsText(file).then(content => `\n\n---\n**添付ファイル: ${file.name}**\n\`\`\`\n${content}\n\`\`\`\n---`);
+                    } else {
+                        return Promise.resolve(`\n\n[添付ファイル: ${file.name} (${formatBytes(file.size)})]`);
+                    }
+                }));
+                combinedMessage += fileContents.join('');
+            }
+
+            const timestamp = Date.now();
+            
+            const userIconPreview = document.getElementById('user-icon-preview');
+            const userIconValue = userIconPreview.dataset.iconValue || 'human';
+            addMessageToChat("あなた", combinedMessage, 'user', timestamp, userIconValue);
+            conversationHistory.push({ role: 'user', parts: [{ text: combinedMessage }], timestamp: timestamp, isHuman: true, participantIndex: 0 });
+            
+            // Cleanup
+            userMessageInput.value = '';
+            attachedFiles = [];
+            renderFilePreviews();
+            fileUploadInput.value = '';
+            sendMessageBtn.disabled = false;
+            attachFileBtn.disabled = false;
+            
+            currentTurn = 1; // Set turn to the first consultant
+            startConversation();
+        }
+
+        // --- Post Edit/Delete Functions ---
+        function deletePost(timestamp) {
+            const message = conversationHistory.find(m => m.timestamp === timestamp);
+            if (!message) return;
+            const participant = participants[message.participantIndex];
+            const name = message.isHuman ? "あなた" : participant.name;
+            openDeleteConfirmation(`投稿者「${name}」のレスを本当に削除しますか？`, () => {
+                const index = conversationHistory.findIndex(m => m.timestamp === timestamp);
+                if (index > -1) conversationHistory.splice(index, 1);
+                const postElement = document.querySelector(`.post[data-timestamp="${timestamp}"]`);
+                if (postElement) postElement.remove();
+                updatePostNumbers();
+            });
+        }
+
+        function updatePostNumbers() {
+            const allPosts = document.querySelectorAll('.post');
+            allPosts.forEach((post, index) => {
+                const numberEl = post.querySelector('.post-header span.font-semibold');
+                if (numberEl) numberEl.textContent = `${index + 1}.`;
+            });
+            postCounter = allPosts.length + 1;
+        }
+
+        function toggleEditView(timestamp) {
+            const postElement = document.querySelector(`.post[data-timestamp="${timestamp}"]`);
+            if (!postElement) return;
+
+            const postBody = postElement.querySelector('.post-body');
+            const existingEditContainer = postElement.querySelector('.edit-container');
+
+            if (existingEditContainer) {
+                // Exit edit mode
+                existingEditContainer.remove();
+                postBody.style.display = 'block';
+            } else {
+                // Enter edit mode
+                const messageIndex = conversationHistory.findIndex(m => m.timestamp === timestamp);
+                if (messageIndex === -1) return;
+                const originalText = conversationHistory[messageIndex].parts[0].text;
+                
+                postBody.style.display = 'none';
+
+                const editContainer = document.createElement('div');
+                editContainer.className = 'edit-container mt-2 w-full';
+                
+                const textarea = document.createElement('textarea');
+                textarea.className = 'w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg text-sm';
+                textarea.rows = Math.max(5, (originalText.match(/\n/g) || []).length + 2);
+                textarea.value = originalText;
+
+                const buttonGroup = document.createElement('div');
+                buttonGroup.className = 'flex justify-end space-x-2 mt-2';
+                const saveButton = document.createElement('button');
+                saveButton.textContent = '保存';
+                saveButton.className = 'py-1 px-3 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-700';
+                saveButton.onclick = () => saveEdit(timestamp);
+                const cancelButton = document.createElement('button');
+                cancelButton.textContent = 'キャンセル';
+                cancelButton.className = 'py-1 px-3 bg-slate-500 text-white text-sm font-semibold rounded-md hover:bg-slate-600';
+                cancelButton.onclick = () => toggleEditView(timestamp);
+
+                buttonGroup.appendChild(cancelButton);
+                buttonGroup.appendChild(saveButton);
+                editContainer.appendChild(textarea);
+                editContainer.appendChild(buttonGroup);
+
+                postBody.after(editContainer);
+                textarea.focus();
+            }
+        }
+
+        function saveEdit(timestamp) {
+            const postElement = document.querySelector(`.post[data-timestamp="${timestamp}"]`);
+            if (!postElement) return;
+
+            const textarea = postElement.querySelector('.edit-container textarea');
+            if (!textarea) return;
+            const newText = textarea.value;
+
+            const messageIndex = conversationHistory.findIndex(m => m.timestamp === timestamp);
+            if (messageIndex > -1) conversationHistory[messageIndex].parts[0].text = newText;
+
+            const postBody = postElement.querySelector('.post-body');
+            const unsafeHtml = marked.parse(newText, { breaks: true, gfm: true });
+            postBody.innerHTML = DOMPurify.sanitize(unsafeHtml);
+            
+            toggleEditView(timestamp); // This will remove the edit UI
+        }
+        
+        async function handleIconUrlLoad() {
+            const url = iconUrlInput.value.trim();
+            if (!url) {
+                addSystemMessage("画像URLを入力してください。");
+                return;
+            }
+
+            const originalText = iconUrlLoadBtn.textContent;
+            iconUrlLoadBtn.disabled = true;
+            iconUrlLoadBtn.textContent = '読込中...';
+
+            try {
+                const resizedDataUrl = await resizeImageFromSrc(url);
+                selectIcon(resizedDataUrl);
+            } catch (error) {
+                console.error("URLからの画像読み込みに失敗:", error);
+                addSystemMessage(error.message);
+            } finally {
+                iconUrlLoadBtn.disabled = false;
+                iconUrlLoadBtn.textContent = originalText;
+                iconUrlInput.value = '';
+            }
+        }
+
+        async function handleIconPaste() {
+            try {
+                if (!navigator.clipboard || !navigator.clipboard.read) {
+                    addSystemMessage("お使いのブラウザはクリップボードからの貼り付けに対応していません。");
+                    return;
+                }
+                const clipboardItems = await navigator.clipboard.read();
+                for (const item of clipboardItems) {
+                    const imageType = item.types.find(type => type.startsWith("image/"));
+                    if (imageType) {
+                        const blob = await item.getType(imageType);
+                        // Use the existing readFileAsDataURL which works fine with blobs
+                        const dataUrl = await readFileAsDataURL(blob);
+                        const resizedDataUrl = await resizeImageFromSrc(dataUrl);
+                        selectIcon(resizedDataUrl);
+                        return; // Exit after finding the first image
+                    }
+                }
+                addSystemMessage("クリップボードに画像が見つかりませんでした。");
+            } catch (err) {
+                console.error("貼り付けに失敗:", err);
+                const errorMessage = `貼り付けに失敗しました: ${err.name === 'NotAllowedError' ? '権限がありません。ブラウザの設定を確認してください。' : err.message}`;
+                addSystemMessage(errorMessage);
+            }
+        }
+        
+        // --- File Handling Functions ---
+        function handleFileSelect(event) {
+            attachedFiles.push(...event.target.files);
+            renderFilePreviews();
+            fileUploadInput.value = ''; // Reset to allow selecting the same file again
+        }
+
+        function renderFilePreviews() {
+            if (attachedFiles.length === 0) {
+                filePreviewContainer.classList.add('hidden');
+                filePreviewContainer.innerHTML = '';
+                return;
+            }
+            filePreviewContainer.classList.remove('hidden');
+            filePreviewContainer.innerHTML = '';
+
+            attachedFiles.forEach(file => {
+                const previewElement = document.createElement('div');
+                previewElement.className = 'file-preview-item text-sm';
+                
+                const objectURL = URL.createObjectURL(file);
+                const isImage = file.type.startsWith('image/');
+
+                previewElement.innerHTML = `
+                    <div class="flex-shrink-0 w-10 h-10 mr-3 flex items-center justify-center bg-slate-200 dark:bg-slate-600 rounded">
+                        ${isImage ? 
+                            `<img src="${objectURL}" class="w-full h-full object-cover rounded" onload="URL.revokeObjectURL(this.src)">` :
+                            `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>`
+                        }
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <p class="font-medium text-slate-800 dark:text-slate-200 truncate">${file.name}</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">${formatBytes(file.size)}</p>
+                    </div>
+                    <button title="削除" class="remove-btn flex-shrink-0 p-1 ml-2 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
+                `;
+                
+                previewElement.querySelector('.remove-btn').addEventListener('click', () => removeFile(file));
+                filePreviewContainer.appendChild(previewElement);
+            });
+        }
+
+        const populateManagerList = (container, key, presets, editFn, deleteFn) => {
+            const customPersonas = loadCustomPersonas(key);
+            const allPersonas = { ...presets, ...customPersonas };
+            container.innerHTML = '';
+
+            const sortedKeys = Object.keys(allPersonas).sort((a, b) => {
+                const aIsDefault = a in presets;
+                const bIsDefault = b in presets;
+                if (aIsDefault && !bIsDefault) return -1;
+                if (!aIsDefault && bIsDefault) return 1;
+                return allPersonas[a].title.localeCompare(allPersonas[b].title, 'ja');
+            });
+
+            if (sortedKeys.length === 0) {
+                const personaType = key === CUSTOM_CONSULTANTS_KEY ? 'コンサルタント' : 'ユーザー';
+                container.innerHTML = `<p class="text-slate-500 dark:text-slate-400">保存されたカスタム${personaType}はありません。</p>`;
+                return;
+            }
+
+            const list = document.createElement('ul');
+            list.className = 'space-y-3';
+            sortedKeys.forEach(k => {
+                const preset = allPersonas[k];
+                const isDefault = k in presets;
+
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg';
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'flex items-center mr-4 min-w-0';
+                
+                const iconPreview = document.createElement('div');
+                iconPreview.className = 'w-8 h-8 mr-3 flex-shrink-0 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center text-xl';
+                renderIconPreview(iconPreview, preset.icon || 'default');
+                nameDiv.appendChild(iconPreview);
+
+                if (isDefault) {
+                    const defaultBadge = document.createElement('span');
+                    defaultBadge.textContent = 'デフォルト';
+                    defaultBadge.className = 'mr-3 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 dark:bg-slate-600 dark:text-slate-200 flex-shrink-0';
+                    nameDiv.appendChild(defaultBadge);
+                }
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = preset.title;
+                nameSpan.className = 'font-medium text-slate-700 dark:text-slate-300 truncate';
+                nameDiv.appendChild(nameSpan);
+
+                const buttonGroup = document.createElement('div');
+                buttonGroup.className = 'space-x-2 flex-shrink-0';
+                
+                const editButton = document.createElement('button');
+                editButton.textContent = '編集';
+                editButton.className = 'py-1 px-3 bg-sky-600 text-white text-sm font-semibold rounded-md hover:bg-sky-700';
+                editButton.onclick = () => editFn(k);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = '削除';
+                deleteButton.className = 'py-1 px-3 bg-red-600 text-white text-sm font-semibold rounded-md hover:bg-red-700 transition-opacity';
+                
+                if (isDefault) {
+                    deleteButton.disabled = true;
+                    deleteButton.classList.add('opacity-40', 'cursor-not-allowed');
+                    deleteButton.title = "デフォルトのプリセットは削除できません。";
+                } else {
+                    const personaType = key === CUSTOM_CONSULTANTS_KEY ? 'コンサルタント' : 'ユーザー';
+                    deleteButton.onclick = () => openDeleteConfirmation(`カスタム${personaType}「${preset.title}」を本当に削除しますか？`, () => deleteFn(k));
+                }
+
+                buttonGroup.appendChild(editButton);
+                buttonGroup.appendChild(deleteButton);
+                li.appendChild(nameDiv);
+                li.appendChild(buttonGroup);
+                list.appendChild(li);
+            });
+            container.appendChild(list);
+        };
+        
+        // --- Dropdown and Field Update functions ---
+        const populateUserDropdown = () => populatePersonaDropdown(userTypeSelect, userPresets, loadCustomPersonas(CUSTOM_USERS_KEY));
+        const updateUserFields = () => updatePersonaFields(userTypeSelect, userNameInput, userPersonaTextarea, userPresets, loadCustomPersonas(CUSTOM_USERS_KEY));
+        const populateConsultantDropdowns = () => {
+            document.querySelectorAll('.consultant-type-select').forEach(select => {
+                populatePersonaDropdown(select, consultantPresets, loadCustomPersonas(CUSTOM_CONSULTANTS_KEY));
+            });
+        };
+        const updateConsultantFieldsFromDropdown = (selectEl) => updatePersonaFields(selectEl, null, null, consultantPresets, loadCustomPersonas(CUSTOM_CONSULTANTS_KEY));
+
+
+        // --- Consultant Specific ---
+        const populateConsultantManagerList = () => populateManagerList(customConsultantListContainer, CUSTOM_CONSULTANTS_KEY, consultantPresets, openEditConsultantModal, deleteCustomConsultant);
+        function openEditConsultantModal(key) {
+            editingConsultantKey = key;
+            const allConsultants = { ...consultantPresets, ...loadCustomPersonas(CUSTOM_CONSULTANTS_KEY) };
+            const consultant = allConsultants[key];
+            if(consultant) {
+                editConsultantPresetNameInput.value = consultant.title;
+                editConsultantNameInput.value = consultant.name;
+                editConsultantPersonaTextarea.value = consultant.persona;
+                const iconValue = consultant.icon || 'default';
+                const previewEl = document.getElementById('edit-consultant-icon-preview');
+                previewEl.dataset.iconValue = iconValue;
+                renderIconPreview(previewEl, iconValue);
+                editConsultantModal.classList.replace('hidden', 'flex');
+            }
+        }
+        function performEditConsultantSave() {
+            if (!editingConsultantKey) return;
+            
+            const title = editConsultantPresetNameInput.value.trim();
+            const name = editConsultantNameInput.value.trim();
+            const persona = editConsultantPersonaTextarea.value.trim();
+            const icon = document.getElementById('edit-consultant-icon-preview').dataset.iconValue;
+
+            if (!title || !name || !persona) {
+                alert("すべてのフィールドを入力してください。");
+                return;
+            }
+            
+            const customConsultants = loadCustomPersonas(CUSTOM_CONSULTANTS_KEY);
+            const allConsultants = { ...consultantPresets, ...customConsultants };
+
+            for (const key in allConsultants) {
+                if (key === editingConsultantKey) continue;
+                if (allConsultants[key].title === title) {
+                    alert(`プリセット名「${title}」は既に使用されています。`);
+                    return;
+                }
+            }
+
+            const isDefault = editingConsultantKey in consultantPresets;
+            const keyToSave = isDefault ? `custom_consultant_${Date.now()}` : editingConsultantKey;
+
+            if (isDefault) {
+                addSystemMessage(`デフォルトのプリセット「${consultantPresets[editingConsultantKey].title}」を基に、新しいカスタムプリセット「${title}」を作成しました。`);
+            }
+
+            customConsultants[keyToSave] = { title, name, persona, icon };
+            saveCustomPersonas(CUSTOM_CONSULTANTS_KEY, customConsultants);
+
+            populateConsultantDropdowns();
+            document.querySelectorAll('.consultant-block').forEach(block => {
+                const select = block.querySelector('.consultant-type-select');
+                if (select.value === editingConsultantKey) {
+                    if (isDefault) select.value = keyToSave;
+                    updateConsultantFieldsFromDropdown(select);
+                }
+            });
+            populateConsultantManagerList();
+            editConsultantModal.classList.replace('flex', 'hidden'); 
+            editingConsultantKey = null;
+        }
+        function deleteCustomConsultant(keyToDelete) {
+            const customConsultants = loadCustomPersonas(CUSTOM_CONSULTANTS_KEY);
+            delete customConsultants[keyToDelete];
+            saveCustomPersonas(CUSTOM_CONSULTANTS_KEY, customConsultants);
+            populateConsultantDropdowns();
+            document.querySelectorAll('.consultant-block').forEach(block => {
+                const select = block.querySelector('.consultant-type-select');
+                if (select.value === keyToDelete) {
+                    select.value = Object.keys(consultantPresets)[0];
+                    updateConsultantFieldsFromDropdown(select);
+                }
+            });
+            populateConsultantManagerList();
+        }
+
+        // --- User Specific ---
+        const populateUserManagerList = () => populateManagerList(customUserListContainer, CUSTOM_USERS_KEY, userPresets, openEditUserModal, deleteCustomUser);
+        function openEditUserModal(key) {
+            editingUserKey = key;
+            const allUsers = { ...userPresets, ...loadCustomPersonas(CUSTOM_USERS_KEY) };
+            const user = allUsers[key];
+            if(user) {
+                editUserPresetNameInput.value = user.title;
+                editUserNameInput.value = user.name;
+                editUserPersonaTextarea.value = user.persona;
+                const iconValue = user.icon || 'default';
+                const previewEl = document.getElementById('edit-user-icon-preview');
+                previewEl.dataset.iconValue = iconValue;
+                renderIconPreview(previewEl, iconValue);
+                editUserModal.classList.replace('hidden', 'flex');
+            }
+        }
+        function performEditUserSave() {
+            if (!editingUserKey) return;
+
+            const title = editUserPresetNameInput.value.trim();
+            const name = editUserNameInput.value.trim();
+            const persona = editUserPersonaTextarea.value.trim();
+            const icon = document.getElementById('edit-user-icon-preview').dataset.iconValue;
+
+            if (!title || !name || !persona) {
+                alert("すべてのフィールドを入力してください。");
+                return;
+            }
+
+            const customUsers = loadCustomPersonas(CUSTOM_USERS_KEY);
+            const allUsers = { ...userPresets, ...customUsers };
+
+            for (const key in allUsers) {
+                if (key === editingUserKey) continue;
+                if (allUsers[key].title === title) {
+                    alert(`プリセット名「${title}」は既に使用されています。`);
+                    return;
+                }
+            }
+
+            const isDefault = editingUserKey in userPresets;
+            const keyToSave = isDefault ? `custom_user_${Date.now()}` : editingUserKey;
+
+            if (isDefault) {
+                addSystemMessage(`デフォルトのプリセット「${userPresets[editingUserKey].title}」を基に、新しいカスタムプリセット「${title}」を作成しました。`);
+            }
+            
+            customUsers[keyToSave] = { title, name, persona, icon };
+            saveCustomPersonas(CUSTOM_USERS_KEY, customUsers);
+
+            const currentSelection = userTypeSelect.value;
+            populateUserDropdown();
+            
+            if (currentSelection === editingUserKey && isDefault) {
+                userTypeSelect.value = keyToSave;
+            } else {
+                 userTypeSelect.value = currentSelection;
+            }
+            
+            updateUserFields();
+            populateUserManagerList();
+            editUserModal.classList.replace('flex', 'hidden'); 
+            editingUserKey = null;
+        }
+        function deleteCustomUser(keyToDelete) {
+            const customUsers = loadCustomPersonas(CUSTOM_USERS_KEY);
+            delete customUsers[keyToDelete];
+            saveCustomPersonas(CUSTOM_USERS_KEY, customUsers);
+            const currentSelection = userTypeSelect.value;
+            populateUserDropdown();
+            if(currentSelection === keyToDelete) {
+                userTypeSelect.value = 'beginner';
+                updateUserFields();
+            }
+            populateUserManagerList();
+        }
+
+        function openSaveModal() {
+            saveNameInput.value = document.getElementById('topic').value || `無題のスレッド ${new Date().toLocaleString('ja-JP')}`;
+            saveModal.classList.replace('hidden', 'flex');
+        }
+
+        function performSave() {
+            const saveName = saveNameInput.value; if (!saveName) return;
+            buildParticipants();
+            const state = { settings: {}, conversationHistory, totalTokensUsed, totalInputTokensUsed, totalOutputTokensUsed, participants };
+            settingsIds.forEach(id => { 
+                const el = document.getElementById(id);
+                if (el) state.settings[id] = el.value; 
+            });
+            const discussionMode = document.querySelector('input[name="discussion-mode"]:checked');
+            state.settings['discussion-mode'] = discussionMode ? discussionMode.value : 'interactive';
+            state.settings['sound-toggle'] = soundToggle.checked;
+            state.settings['background-icon-toggle'] = backgroundIconToggle.checked;
+            state.settings['controller-toggle'] = controllerToggle.checked;
+
+            const saves = loadObjectFromStorage(SAVED_THREADS_KEY);
+            saves[saveName] = state;
+            saveObjectToStorage(SAVED_THREADS_KEY, saves);
+            saveBtn.textContent = '保存しました！'; setTimeout(() => { saveBtn.textContent = '名前を付けて保存'; }, 1500);
+            saveModal.classList.replace('flex', 'hidden');
+        }
+        
+        function populateLoadList() {
+            const saves = loadObjectFromStorage(SAVED_THREADS_KEY);
+            const loadListContainer = document.getElementById('load-list-container');
+            loadListContainer.innerHTML = '';
+            const savedNames = Object.keys(saves);
+
+            if (savedNames.length === 0) {
+                loadListContainer.innerHTML = '<p class="text-slate-500 dark:text-slate-400">保存されたスレッドはありません。</p>';
+            } else {
+                const list = document.createElement('ul');
+                list.className = 'space-y-3';
+                savedNames.forEach(name => {
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-700 rounded-lg';
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = name;
+                    nameSpan.className = 'font-medium text-slate-700 dark:text-slate-300 mr-4 truncate';
+                    const buttonGroup = document.createElement('div');
+                    buttonGroup.className = 'space-x-2 flex-shrink-0';
+
+                    const loadButton = document.createElement('button');
+                    loadButton.textContent = '復元';
+                    loadButton.className = 'py-1 px-3 bg-amber-600 text-white text-sm font-semibold rounded-md hover:bg-amber-700';
+                    loadButton.onclick = () => performLoad(name);
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = '削除';
+                    deleteButton.className = 'py-1 px-3 bg-red-600 text-white text-sm font-semibold rounded-md hover:bg-red-700';
+                    deleteButton.onclick = () => openDeleteConfirmation(`スレッド「${name}」を本当に削除しますか？`, () => deleteSave(name));
+                    
+                    buttonGroup.appendChild(loadButton);
+                    buttonGroup.appendChild(deleteButton);
+                    li.appendChild(nameSpan);
+                    li.appendChild(buttonGroup);
+                    list.appendChild(li);
+                });
+                loadListContainer.appendChild(list);
+            }
+        }
+
+        function openDeleteConfirmation(message, onConfirm) {
+             confirmMessage.textContent = message;
+             confirmModal.classList.replace('hidden', 'flex');
+             confirmYesBtn.onclick = () => { if(onConfirm) onConfirm(); confirmModal.classList.replace('flex', 'hidden'); };
+        }
+        function performLoad(saveName) { 
+            const saves = loadObjectFromStorage(SAVED_THREADS_KEY);
+            const state = saves[saveName]; if (!state) { addSystemMessage(`スレッド「${saveName}」の読み込みに失敗しました。`); loadModal.classList.replace('flex', 'hidden'); return; }
+            if (isRunning) stopConversation();
+
+            document.getElementById('consultant-settings-container').innerHTML = '';
+
+            settingsIds.forEach(id => { if(state.settings[id] !== undefined && document.getElementById(id)) document.getElementById(id).value = state.settings[id]; });
+            updateThreadTitle();
+            
+            if(state.settings['sound-toggle'] !== undefined) soundToggle.checked = state.settings['sound-toggle'];
+            if(state.settings['background-icon-toggle'] !== undefined) backgroundIconToggle.checked = state.settings['background-icon-toggle'];
+            
+            if(state.settings['controller-toggle'] !== undefined) {
+                controllerToggle.checked = state.settings['controller-toggle'];
+            } else {
+                controllerToggle.checked = true; // Default to visible if not in save data
+            }
+            scrollController.classList.toggle('hidden', !controllerToggle.checked);
+            
+            toggleIconOptionsVisibility();
+            if (document.getElementById('background-icon-opacity').value) {
+                updateBgIconOpacity();
+            }
+
+
+            const savedMode = state.settings['discussion-mode'] || 'interactive';
+            const radioToSelect = document.querySelector(`input[name="discussion-mode"][value="${savedMode}"]`);
+            if (radioToSelect) radioToSelect.checked = true;
+            
+            if (state.participants) {
+                participants = state.participants;
+                const userP = participants[0];
+                 if(userP) {
+                    const allUserPresets = { ...userPresets, ...loadCustomPersonas(CUSTOM_USERS_KEY) };
+                    const userPresetKey = Object.keys(allUserPresets).find(key => allUserPresets[key].name === userP.name && allUserPresets[key].persona.trim() === userP.persona.trim() && allUserPresets[key].icon === userP.icon);
+                    if (userPresetKey) {
+                        userTypeSelect.value = userPresetKey;
+                    }
+                    updateUserFields();
+                    const userIconPreview = document.getElementById('user-icon-preview');
+                    userIconPreview.dataset.iconValue = userP.icon || 'default';
+                    renderIconPreview(userIconPreview, userP.icon || 'default');
+                 }
+                
+                participants.slice(1).forEach((p) => {
+                    const block = addConsultantBlock(p.id, false);
+                    const typeSelect = block.querySelector('.consultant-type-select');
+                    const allConsultantPresets = { ...consultantPresets, ...loadCustomPersonas(CUSTOM_CONSULTANTS_KEY) };
+                    const presetKey = Object.keys(allConsultantPresets).find(key => allConsultantPresets[key].name === p.name && allConsultantPresets[key].persona.trim() === p.persona.trim() && allConsultantPresets[key].icon === p.icon);
+                    
+                    if(presetKey) typeSelect.value = presetKey;
+                    block.querySelector(`#consultant-name-${p.id}`).value = p.name;
+                    block.querySelector(`#consultant-persona-${p.id}`).value = p.persona;
+                    const iconPreview = block.querySelector(`#consultant-icon-preview-${p.id}`);
+                    iconPreview.dataset.iconValue = p.icon || 'default';
+                    renderIconPreview(iconPreview, p.icon || 'default');
+                });
+            } else {
+                participants = [];
+            }
+
+            updateMaxCharsDisplay();
+            updateHistoryLengthDisplay();
+            conversationHistory = state.conversationHistory || []; 
+            totalTokensUsed = state.totalTokensUsed || 0;
+            totalInputTokensUsed = state.totalInputTokensUsed || 0;
+            totalOutputTokensUsed = state.totalOutputTokensUsed || 0;
+            
+            if (conversationHistory.length > 0) {
+                 // ... [existing turn logic] ...
+            } else {
+                currentTurn = 1;
+            }
+
+            chatContainer.innerHTML = `<div class="initial-message text-center p-8 text-slate-500 dark:text-slate-400"><h2 class="text-xl font-semibold mb-2">AIコンサル掲示板</h2><p>「議論開始」ボタンを押すと、AI同士の議論が始まります。</p></div>`;
+            postCounter = 1;
+            updateTokenDisplay();
+            
+            conversationHistory.forEach(m => {
+                const participant = participants[m.participantIndex];
+                 if (!participant) {
+                    console.error("Saved history contains an invalid participant index:", m);
+                    return; 
+                }
+                const name = participant.type === 'user' ? (m.isHuman ? "あなた" : participant.name) : participant.name;
+                const role = participant.type === 'user' ? 'user' : 'model';
+                const iconValue = participant.icon;
+                addMessageToChat(name, m.parts[0].text, role, m.timestamp, iconValue);
+            });
+            loadModal.classList.replace('flex', 'hidden');
+        }
+        function deleteSave(saveName) {
+             const saves = loadObjectFromStorage(SAVED_THREADS_KEY);
+            delete saves[saveName];
+            saveObjectToStorage(SAVED_THREADS_KEY, saves);
+            populateLoadList();
+        }
+        function sanitizeFilename(name) { return name.replace(/[\\/:*?"<>|]/g, '_'); }
+        function downloadAsJson() {
+            const content = getJsonContent();
+            if (!content) return;
+            const filename = `${sanitizeFilename(content.topic)}.json`;
+            const dataStr = JSON.stringify(content, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+        function downloadAsDat() {
+            const content = getDatContent();
+            if (!content) return;
+            const filename = `${sanitizeFilename(content.topic)}.dat`;
+            const blob = new Blob([content.data], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+        
+        function getJsonContent() {
+             if (conversationHistory.length === 0) { addSystemMessage("エクスポートするデータがありません。"); return null; }
+            buildParticipants();
+            const topic = document.getElementById('topic').value || 'discussion';
+            const discussionMode = document.querySelector('input[name="discussion-mode"]:checked');
+            const state = { topic, settings: {}, participants, conversationHistory, totalInputTokensUsed, totalOutputTokensUsed };
+            settingsIds.forEach(id => { const el = document.getElementById(id); if (el) { state.settings[id] = el.value; } });
+            state.settings['discussion-mode'] = discussionMode ? discussionMode.value : 'interactive';
+            state.settings['sound-toggle'] = soundToggle.checked;
+            state.settings['background-icon-toggle'] = backgroundIconToggle.checked;
+            state.settings['controller-toggle'] = controllerToggle.checked;
+            return state;
+        }
+
+        function getDatContent() {
+            if (conversationHistory.length === 0) { addSystemMessage("エクスポートするデータがありません。"); return null; }
+            buildParticipants();
+            const topic = document.getElementById('topic').value || 'discussion';
+            let datContent = `${topic}<>\n`;
+            conversationHistory.forEach(m => {
+                const p = participants[m.participantIndex]; if (!p) return;
+                const name = m.isHuman ? "あなた" : p.name;
+                const text = m.parts[0].text.replace(/\n/g, '<br>');
+                const ts = m.timestamp ? Math.floor(new Date(m.timestamp).getTime() / 1000) : Math.floor(Date.now() / 1000);
+                datContent += `${name}<>mail<> ${new Date(ts * 1000).toLocaleString('ja-JP')} <> ${text} <>\n`;
+            });
+            return { topic, data: datContent };
+        }
+        
+        function downloadSummary(format) {
+            if (!currentSummaryMarkdown) { alert("要約データがありません。"); return; }
+            const topic = document.getElementById('topic').value || 'discussion';
+            const filename = `${sanitizeFilename(topic)}_summary.${format}`;
+            let content = '', mimeType = '';
+            if (format === 'txt') { content = summaryContent.innerText; mimeType = 'text/plain'; } 
+            else if (format === 'md') { content = currentSummaryMarkdown; mimeType = 'text/markdown'; } 
+            else { return; }
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+        
+        async function performPersonaGeneration() {
+            const keywords = personaKeywordsInput.value.trim();
+            if (!keywords) { alert("キーワードを入力してください。"); return; }
+            if (!apiKey && !IS_CANVAS_ENV) {
+                alert("ペルソナ自動生成機能を利用するには、Gemini APIキーを設定してください。");
+                return;
+            }
+
+            personaGenerationSpinner.classList.remove('hidden');
+            confirmGeneratePersonaBtn.disabled = true;
+
+            const personaSchema = {
+                type: 'OBJECT',
+                properties: {
+                    name: { type: 'STRING', description: `生成された${personaGenerationTarget === 'consultant' ? 'コンサルタント' : 'ユーザー'}のユニークな名前。` },
+                    persona: { type: 'STRING', description: `生成された${personaGenerationTarget === 'consultant' ? 'コンサルタント' : 'ユーザー'}の役割、専門性、口調などを詳細に記述したペルソナ。` }
+                },
+                required: ['name', 'persona']
+            };
+            const prompt = `あなたは、ユニークで専門性の高いAIペルソナを生成するAIです。以下のキーワードに合致する、優秀な${personaGenerationTarget === 'consultant' ? 'コンサルタント' : 'ユーザー'}の「名前」と「ペルソナ」を考えてください。\n\nキーワード: "${keywords}"\n\n出力は必ず指定されたJSON形式に従ってください。`;
+            const payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", responseSchema: personaSchema, }, };
+
+            try {
+                const result = await generateContentWithRetry(payload);
+                const usage = result?.usageMetadata || {};
+                totalInputTokensUsed += usage.promptTokenCount || 0;
+                totalOutputTokensUsed += usage.candidatesTokenCount || 0;
+                updateTokenDisplay();
+                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    const personaData = JSON.parse(text);
+                    if (personaGenerationTarget === 'consultant') {
+                        newConsultantNameInput.value = personaData.name;
+                        newConsultantPersonaTextarea.value = personaData.persona;
+                        newConsultantPresetNameInput.value = keywords;
+                    } else {
+                        newUserNameInput.value = personaData.name;
+                        newUserPersonaTextarea.value = personaData.persona;
+                        newUserPresetNameInput.value = keywords;
+                    }
+                    generatePersonaModal.classList.replace('flex', 'hidden');
+                } else { throw new Error("APIから有効なデータが返されませんでした。"); }
+            } catch(error) {
+                console.error("ペルソナの自動生成に失敗しました:", error);
+                alert("ペルソナの生成に失敗しました。キーワードを変えて再度お試しください。");
+            } finally {
+                personaGenerationSpinner.classList.add('hidden');
+                confirmGeneratePersonaBtn.disabled = false;
+                personaKeywordsInput.value = '';
+            }
+        }
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                themeIconLight.classList.add('hidden');
+                themeIconDark.classList.remove('hidden');
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeIconLight.classList.remove('hidden');
+                themeIconDark.classList.add('hidden');
+            }
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const newTheme = isDark ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            applyTheme(newTheme);
+        }
+
+        // --- Dynamic Consultant Block Functions ---
+        function addConsultantBlock(id = `c_${Date.now()}`, applyDefault = true) {
+            const container = document.getElementById('consultant-settings-container');
+            const consultantCount = container.children.length + 1;
+            const block = document.createElement('div');
+            block.className = 'consultant-block border-t-4 border-indigo-200 dark:border-indigo-800 pt-4';
+            block.dataset.id = id;
+
+            block.innerHTML = `
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center">
+                        コンサルタント AI #${consultantCount}
+                    </h2>
+                    ${consultantCount > 1 ? '<button class="remove-consultant-btn p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" title="このコンサルタントを削除"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>' : ''}
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">アイコン</label>
+                    <div class="flex items-center space-x-3">
+                        <div id="consultant-icon-preview-${id}" class="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 text-3xl"></div>
+                        <button class="change-consultant-icon-btn py-1 px-3 bg-slate-200 dark:bg-slate-600 text-sm rounded-md" data-target-id="${id}">変更</button>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 mb-1">
+                    <label for="consultant-type-${id}" class="block text-sm font-medium text-slate-700 dark:text-slate-300">コンサルタントの種類</label>
+                    <button class="manage-consultants-btn text-xs text-indigo-600 dark:text-indigo-400 hover:underline">管理</button>
+                </div>
+                <select id="consultant-type-${id}" class="consultant-type-select w-full p-2 mb-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                <label for="consultant-name-${id}" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">名前</label>
+                <input type="text" id="consultant-name-${id}" class="w-full p-2 mb-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg" value="">
+                <label for="consultant-persona-${id}" class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ペルソナ（役割設定）</label>
+                <textarea id="consultant-persona-${id}" rows="6" class="w-full p-3 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-200 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-sm"></textarea>
+            `;
+            container.appendChild(block);
+
+            const typeSelect = block.querySelector('.consultant-type-select');
+            populatePersonaDropdown(typeSelect, consultantPresets, loadCustomPersonas(CUSTOM_CONSULTANTS_KEY));
+            
+            if (applyDefault) {
+                const presetKeys = Object.keys(consultantPresets);
+                const defaultKey = presetKeys[(consultantCount - 1) % presetKeys.length];
+                typeSelect.value = defaultKey;
+                updateConsultantFieldsFromDropdown(typeSelect);
+            }
+
+            typeSelect.addEventListener('change', (e) => updateConsultantFieldsFromDropdown(e.target));
+            block.querySelector('.manage-consultants-btn').addEventListener('click', () => {
+                populateConsultantManagerList();
+                manageConsultantsModal.classList.replace('hidden', 'flex');
+            });
+            block.querySelector('.change-consultant-icon-btn').addEventListener('click', (e) => {
+                openIconPicker(e.currentTarget.dataset.targetId);
+            });
+
+            const removeBtn = block.querySelector('.remove-consultant-btn');
+            if(removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    block.remove();
+                    document.querySelectorAll('.consultant-block').forEach((b, index) => {
+                        b.querySelector('h2').textContent = `コンサルタント AI #${index + 1}`;
+                    });
+                });
+            }
+            return block;
+        }
+
+        function initializeApp() {
+            try {
+                const savedTheme = localStorage.getItem('theme');
+                applyTheme(savedTheme || 'light');
+            } catch (e) {
+                console.error("Error applying initial theme:", e);
+                applyTheme('light');
+            }
+            
+            if (IS_CANVAS_ENV) {
+                // Canvas環境: APIキー入力を無効化し、メッセージを表示
+                const canvasMessage = "Canvas環境ではAPIキーは不要です。";
+                
+                // Gemini
+                const geminiInput = document.getElementById('gemini-api-key-input');
+            const geminiSaveBtn = document.getElementById('save-gemini-api-key-btn');
+            geminiInput.disabled = true;
+            geminiInput.placeholder = canvasMessage;
+            geminiSaveBtn.disabled = true;
+            geminiSaveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            apiKey = "";
+        } else {
+            // Standalone environment: Load keys from localStorage
+                loadGeminiApiKey();
+            }
+
+            addConsultantBlock('default_consultant');
+            populateUserDropdown();
+            updateUserFields();
+            updateMaxCharsDisplay();
+            updateHistoryLengthDisplay();
+            updateThreadTitle();
+            toggleSettings(false);
+            populateIconPicker();
+            updateBgIconOpacity();
+            toggleIconOptionsVisibility();
+            scrollController.classList.toggle('hidden', !controllerToggle.checked);
+            
+        }
+        
+        // --- Gemini API Key Functions ---
+        function loadGeminiApiKey() {
+            const savedApiKey = localStorage.getItem('geminiApiKey');
+            if (savedApiKey) {
+                geminiApiKeyInput.value = savedApiKey;
+                apiKey = savedApiKey;
+            }
+        }
+
+        function saveGeminiApiKey() {
+            const newApiKey = geminiApiKeyInput.value.trim();
+            if (!newApiKey) {
+                addSystemMessage("Gemini APIキーを入力してください。");
+                return;
+            }
+            localStorage.setItem('geminiApiKey', newApiKey);
+            apiKey = newApiKey;
+
+            const btnOriginalText = saveGeminiApiKeyBtn.textContent;
+            saveGeminiApiKeyBtn.textContent = '保存しました！';
+            setTimeout(() => { saveGeminiApiKeyBtn.textContent = btnOriginalText; }, 2000);
+            addSystemMessage("Gemini APIキーを保存しました。");
+        }
+
+        // --- Event Listeners ---
+        saveGeminiApiKeyBtn.addEventListener('click', saveGeminiApiKey);
+
+        topicInput.addEventListener('input', updateThreadTitle);
+        userTypeSelect.addEventListener('change', updateUserFields);
+        changeUserIconBtn.addEventListener('click', () => openIconPicker('user'));
+        backgroundIconToggle.addEventListener('change', () => {
+            document.querySelectorAll('.post').forEach(post => {
+                post.classList.toggle('show-bg-icon', backgroundIconToggle.checked);
+            });
+            toggleIconOptionsVisibility();
+        });
+        backgroundIconOpacitySlider.addEventListener('input', updateBgIconOpacity);
+        backgroundIconPositionSelect.addEventListener('change', () => {
+            const newPosition = backgroundIconPositionSelect.value;
+            const oldPosition = newPosition === 'left' ? 'right' : 'left';
+            document.querySelectorAll('.post').forEach(post => {
+                post.classList.remove(`icon-pos-${oldPosition}`);
+                post.classList.add(`icon-pos-${newPosition}`);
+            });
+        });
+
+        
+        addNewConsultantBtn.addEventListener('click', () => {
+            const title = newConsultantPresetNameInput.value.trim();
+            const name = newConsultantNameInput.value.trim();
+            const persona = newConsultantPersonaTextarea.value.trim();
+            const icon = document.getElementById('new-consultant-icon-preview').dataset.iconValue || 'default';
+            if (!title || !name || !persona) { alert("すべてのフィールドを入力してください。"); return; }
+            const key = `custom_consultant_${Date.now()}`;
+            const customConsultants = loadCustomPersonas(CUSTOM_CONSULTANTS_KEY);
+            customConsultants[key] = { title, name, persona, icon };
+            saveCustomPersonas(CUSTOM_CONSULTANTS_KEY, customConsultants);
+            populateConsultantDropdowns();
+            const allBlocks = document.querySelectorAll('.consultant-block');
+            if (allBlocks.length > 0) {
+                 const lastBlockSelect = allBlocks[allBlocks.length - 1].querySelector('.consultant-type-select');
+                 lastBlockSelect.value = key;
+                 updateConsultantFieldsFromDropdown(lastBlockSelect);
+            }
+            populateConsultantManagerList();
+            newConsultantPresetNameInput.value = ''; newConsultantNameInput.value = ''; newConsultantPersonaTextarea.value = '';
+            const newConsultantPreview = document.getElementById('new-consultant-icon-preview');
+            newConsultantPreview.dataset.iconValue = 'default';
+            renderIconPreview(newConsultantPreview, 'default');
+        });
+
+        addNewUserBtn.addEventListener('click', () => {
+            const title = newUserPresetNameInput.value.trim();
+            const name = newUserNameInput.value.trim();
+            const persona = newUserPersonaTextarea.value.trim();
+            const icon = document.getElementById('new-user-icon-preview').dataset.iconValue || 'default';
+            if (!title || !name || !persona) { alert("すべてのフィールドを入力してください。"); return; }
+            const key = `custom_user_${Date.now()}`;
+            const customUsers = loadCustomPersonas(CUSTOM_USERS_KEY);
+            customUsers[key] = { title, name, persona, icon };
+            saveCustomPersonas(CUSTOM_USERS_KEY, customUsers);
+            populateUserDropdown();
+            userTypeSelect.value = key;
+            updateUserFields();
+            populateUserManagerList();
+            newUserPresetNameInput.value = ''; newUserNameInput.value = ''; newUserPersonaTextarea.value = '';
+            const newUserPreview = document.getElementById('new-user-icon-preview');
+            newUserPreview.dataset.iconValue = 'default';
+            renderIconPreview(newUserPreview, 'default');
+        });
+        
+        saveBtn.addEventListener('click', openSaveModal);
+        confirmSaveBtn.addEventListener('click', performSave);
+        loadBtn.addEventListener('click', () => { populateLoadList(); loadModal.classList.replace('hidden', 'flex'); });
+        downloadJsonBtn.addEventListener('click', downloadAsJson);
+        downloadDatBtn.addEventListener('click', downloadAsDat);
+
+        manageUsersBtn.addEventListener('click', () => { populateUserManagerList(); manageUsersModal.classList.replace('hidden', 'flex'); });
+        confirmGeneratePersonaBtn.addEventListener('click', performPersonaGeneration);
+        confirmEditConsultantBtn.addEventListener('click', performEditConsultantSave);
+        confirmEditUserBtn.addEventListener('click', performEditUserSave);
+        downloadSummaryTxtBtn.addEventListener('click', () => downloadSummary('txt'));
+        downloadSummaryMdBtn.addEventListener('click', () => downloadSummary('md'));
+        generatePersonaInManagerBtn.addEventListener('click', () => { personaGenerationTarget = 'consultant'; });
+        generateUserPersonaInManagerBtn.addEventListener('click', () => { personaGenerationTarget = 'user'; });
+        sendMessageBtn.addEventListener('click', sendUserMessage);
+        userMessageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessageBtn.click();
+            }
+        });
+        themeToggleBtn.addEventListener('click', toggleTheme);
+        attachFileBtn.addEventListener('click', () => fileUploadInput.click());
+        fileUploadInput.addEventListener('change', handleFileSelect);
+        
+        iconUploadBtn.addEventListener('click', () => iconUploadInput.click());
+        iconUrlLoadBtn.addEventListener('click', handleIconUrlLoad);
+        iconPasteBtn.addEventListener('click', handleIconPaste);
+        iconUploadInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                addSystemMessage('エラー: 画像ファイルを選択してください。');
+                iconUploadInput.value = '';
+                return;
+            }
+            
+            // Allow larger files, but set a generous 10MB hard limit to prevent browser issues.
+            if (file.size > 10 * 1024 * 1024) {
+                addSystemMessage('エラー: ファイルサイズが大きすぎます。10MB以下の画像を選択してください。');
+                iconUploadInput.value = '';
+                return;
+            }
+
+            try {
+                // Resize the image to prevent storing huge base64 strings in localStorage.
+                // This effectively allows large uploads while keeping the app performant.
+                const resizedDataUrl = await resizeImage(file, 512); // Resize to max 512x512
+                selectIcon(resizedDataUrl);
+            } catch (error) {
+                console.error("Image processing failed:", error);
+                addSystemMessage("エラー: 画像の処理に失敗しました。別のファイルで試してください。");
+            } finally {
+                iconUploadInput.value = '';
+            }
+        });
+
+        document.querySelectorAll('.change-new-persona-icon-btn').forEach(btn => btn.addEventListener('click', (e) => openIconPicker(e.currentTarget.dataset.targetId)));
+        document.querySelectorAll('.change-edit-persona-icon-btn').forEach(btn => btn.addEventListener('click', (e) => openIconPicker(e.currentTarget.dataset.targetId)));
+
+        // --- Drag & Scroll Controller ---
+        let isDragging = false;
+        let offsetX, offsetY;
+        let hasBeenDragged = false;
+
+        const startDrag = (e) => {
+            // Prevent drag from starting on buttons
+            if (e.target.closest('button')) return;
+
+            isDragging = true;
+            scrollController.classList.add('dragging');
+            
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+            if (!hasBeenDragged) {
+                const rect = scrollController.getBoundingClientRect();
+                scrollController.style.left = `${rect.left}px`;
+                scrollController.style.top = `${rect.top}px`;
+                scrollController.classList.remove('top-1/2', '-translate-y-1/2', 'right-6');
+                hasBeenDragged = true;
+            }
+
+            offsetX = clientX - scrollController.offsetLeft;
+            offsetY = clientY - scrollController.offsetTop;
+            
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchmove', onDrag, { passive: false });
+            document.addEventListener('touchend', endDrag);
+
+            if (e.type === 'touchmove' || e.type === 'touchstart') e.preventDefault();
+        };
+
+        const onDrag = (e) => {
+            if (!isDragging) return;
+            if (e.type === 'touchmove') e.preventDefault();
+
+            const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+            let newLeft = clientX - offsetX;
+            let newTop = clientY - offsetY;
+
+            const controllerRect = scrollController.getBoundingClientRect();
+            const maxX = window.innerWidth - controllerRect.width;
+            const maxY = window.innerHeight - controllerRect.height;
+            
+            newLeft = Math.max(0, Math.min(newLeft, maxX));
+            newTop = Math.max(0, Math.min(newTop, maxY));
+
+            scrollController.style.left = `${newLeft}px`;
+            scrollController.style.top = `${newTop}px`;
+        };
+
+        const endDrag = () => {
+            isDragging = false;
+            scrollController.classList.remove('dragging');
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('mouseup', endDrag);
+            document.removeEventListener('touchmove', onDrag);
+            document.removeEventListener('touchend', endDrag);
+        };
+
+        scrollController.addEventListener('mousedown', startDrag);
+        scrollController.addEventListener('touchstart', startDrag, { passive: false });
+
+        scrollToTopBtn.addEventListener('click', () => {
+            chatContainer.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        scrollToBottomBtn.addEventListener('click', () => {
+            chatContainer.scrollTo({ top: chatContainer.scrollHeight, behavior: 'smooth' });
+        });
+
+        scrollControllerToggleBtn.addEventListener('click', () => {
+            startBtn.click();
+        });
+
+        controllerToggle.addEventListener('change', () => {
+            scrollController.classList.toggle('hidden', !controllerToggle.checked);
+        });
+        
+        // --- Icon Picker ---
+        function populateIconPicker() {
+            iconGrid.innerHTML = '';
+            for (const key in iconPresets) {
+                const item = document.createElement('div');
+                item.className = 'icon-picker-item text-slate-700 dark:text-slate-300';
+                item.dataset.iconKey = key;
+                item.textContent = iconPresets[key];
+                item.addEventListener('click', () => selectIcon(key));
+                iconGrid.appendChild(item);
+            }
+        }
+        function openIconPicker(targetId) {
+            iconPickerTargetId = targetId;
+            iconPickerModal.classList.replace('hidden', 'flex');
+        }
+        function selectIcon(iconValue) {
+            let previewEl;
+             if (iconPickerTargetId === 'user') {
+                previewEl = document.getElementById('user-icon-preview');
+            } else if (iconPickerTargetId === 'new-consultant') {
+                 previewEl = document.getElementById('new-consultant-icon-preview');
+            } else if (iconPickerTargetId === 'new-user') {
+                 previewEl = document.getElementById('new-user-icon-preview');
+            } else if (iconPickerTargetId === 'edit-consultant') {
+                 previewEl = document.getElementById('edit-consultant-icon-preview');
+            } else if (iconPickerTargetId === 'edit-user') {
+                 previewEl = document.getElementById('edit-user-icon-preview');
+            } else {
+                previewEl = document.getElementById(`consultant-icon-preview-${iconPickerTargetId}`);
+            }
+
+            if (previewEl) {
+                previewEl.dataset.iconValue = iconValue;
+                renderIconPreview(previewEl, iconValue);
+            }
+            iconPickerModal.classList.replace('flex', 'hidden');
+        }
+
+        // --- App Initialization ---
+        initializeApp();
+
+    });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
